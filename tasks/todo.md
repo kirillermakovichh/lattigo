@@ -12,7 +12,7 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Scope:** .agents/.
 
-**Acceptance:** Project-local skills retain provenance and licenses; Ronchi runtime guidance is adapted to Go block-lattice contracts.
+**Acceptance:** Project-local skills retain applicable upstream attribution and licenses.
 
 **Verification:** Review skill links and adapted text; git diff --check.
 

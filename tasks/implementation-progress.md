@@ -4,7 +4,6 @@ Date: 2026-11-15.
 
 ## Current state
 
-Repository initialized on main. Local engineering skills imported and adapted from Ronchi.
 Product, protocol requirements, architecture, operations, quality and open decisions documented.
 Go module and local/CI check infrastructure initialized. No application packages exist.
 
