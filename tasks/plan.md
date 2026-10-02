@@ -41,3 +41,17 @@ unresolved proposal. Keep independent work progressing without guessing economic
 
 The initial request authorizes repository setup and documentation. This plan records
 subsequent development order; no ledger or consensus implementation is claimed complete.
+
+## Authorized implementation run
+
+The user now authorizes full implementation with three subagents on separate branches.
+Use docs/implementation-contract.md as the frozen cross-agent contract.
+
+- Core branch: protocol primitives, ledger transitions, durable storage and certificates.
+- Runtime branch: P2P, RPC, node lifecycle and operator endpoints.
+- Wallet branch: encrypted local custody, RPC client and command-line workflows.
+- Integration owner: weighted two-phase confirmation, shared decisions, packaging and end-to-end checks.
+
+Merge coherent blocks with feature history preserved. Compile and verify at integration
+boundaries rather than after every edit. Fix integration-blocking defects immediately.
+Public deployment and external independent review are not implied by writing code.
