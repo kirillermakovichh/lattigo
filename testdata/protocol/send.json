@@ -1,0 +1,17 @@
+{
+  "description": "Canonical send bytes and digest calculated independently with Python hashlib and struct. Public test identity only.",
+  "block": {
+    "version": 1,
+    "network": "3009be769fb8f956e8413ee9f3e0836e34968bc40457d0a10c549d2edcf00cc1",
+    "kind": "send",
+    "account": "bl_3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da294ba2d020",
+    "previous": "",
+    "representative": "bl_3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da294ba2d020",
+    "balance": "99",
+    "link": "bl_3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da294ba2d020",
+    "work": 0,
+    "signature": ""
+  },
+  "canonical_hex": "424c2f626c6f636b2f7631013009be769fb8f956e8413ee9f3e0836e34968bc40457d0a10c549d2edcf00cc1013b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da2900000000000000000000000000000000000000000000000000000000000000003b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da2900000000000000633b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29",
+  "id": "233d7f48686aed5693cfeec2369ffdbb18052408c9349db1f0c044bdd4a0360f"
+}
