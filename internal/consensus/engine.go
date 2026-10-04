@@ -184,6 +184,9 @@ func (e *Engine) submit(b protocol.Block, broadcast bool) (protocol.Hash, error)
 		return "", err
 	}
 	id := b.ID()
+	if _, err := e.cfg.Store.Block(id); err == nil {
+		return id, nil
+	}
 	if _, ok := e.pending[id]; ok {
 		return id, nil
 	}

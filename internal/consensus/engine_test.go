@@ -107,6 +107,13 @@ func TestWeightedNetworkConfirmsAndConservesWeight(t *testing.T) {
 			t.Fatal("voting weight not conserved")
 		}
 	}
+	// Confirmed retries and replayed block gossip must never start another election.
+	if _, err := engines[0].Submit(b); err != nil {
+		t.Fatal(err)
+	}
+	if len(engines[0].Pending()) != 0 || stores[0].Status().Height != 1 {
+		t.Fatal("confirmed retry created pending work")
+	}
 	// Receiving changes the next height's weights, never the preceding certificate.
 	recv := protocol.Block{Version: 1, Network: f.genesis.ID(), Kind: "receive", Account: f.accounts[1], Representative: f.accounts[1], Balance: 110, Link: string(b.ID())}
 	if err := recv.Sign(f.keys[1]); err != nil {

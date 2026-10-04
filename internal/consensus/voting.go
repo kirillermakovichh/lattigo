@@ -300,6 +300,9 @@ func (e *Engine) commit(r ledger.Record, broadcast bool) error {
 		return ledger.ErrDependency
 	}
 	if err := e.cfg.Store.Commit(r); err != nil {
+		if !errors.Is(err, ledger.ErrInvalid) && !errors.Is(err, ledger.ErrConflict) && !errors.Is(err, ledger.ErrDependency) {
+			e.failure = fmt.Errorf("ledger commit failed: %w", err)
+		}
 		return err
 	}
 	if broadcast {
