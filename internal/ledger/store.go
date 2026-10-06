@@ -1,0 +1,326 @@
+package ledger
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"sync"
+	"syscall"
+
+	"example.com/go-block-lattice/internal/protocol"
+	"example.com/go-block-lattice/internal/storage"
+)
+
+type Store struct {
+	mu           sync.RWMutex
+	state        *state
+	journal      *storage.Journal
+	closed       bool
+	failed       error
+	observerOnly bool
+}
+
+func Open(directory string, g protocol.Genesis) (*Store, error) { return open(directory, g, false) }
+func open(directory string, g protocol.Genesis, strict bool) (*Store, error) {
+	if e := g.Validate(); e != nil {
+		return nil, e
+	}
+	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
+	sort.Slice(g.Allocations, func(i, j int) bool { return g.Allocations[i].Account < g.Allocations[j].Account })
+	header, e := json.Marshal(g)
+	if e != nil {
+		return nil, e
+	}
+	s := &Store{state: newState(g)}
+	if _, err := os.Stat(filepath.Join(directory, "RESTORED")); err == nil {
+		s.observerOnly = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	apply := func(p []byte) error {
+		var r Record
+		if e := json.Unmarshal(p, &r); e != nil {
+			return e
+		}
+		if e := s.state.validateRecord(r); e != nil {
+			return e
+		}
+		s.state.apply(r)
+		return nil
+	}
+	if strict {
+		s.journal, e = storage.OpenStrict(directory, header, apply)
+	} else {
+		s.journal, e = storage.Open(directory, header, apply)
+	}
+	if e != nil {
+		return nil, e
+	}
+	return s, nil
+}
+func (s *Store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	return s.journal.Close()
+}
+func (s *Store) Genesis() protocol.Genesis {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	g := s.state.genesis
+	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
+	return g
+}
+func (s *Store) Status() Status {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	a := s.state
+	return Status{Network: a.genesis.ID(), Height: uint64(len(a.records)), Tip: a.tip, Supply: a.genesis.Supply, Accounts: len(a.accounts), Receivables: len(a.receivables)}
+}
+func (s *Store) Account(a protocol.Account) (AccountState, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
+		return AccountState{}, ErrClosed
+	}
+	v, ok := s.state.accounts[a]
+	if !ok {
+		return AccountState{}, ErrNotFound
+	}
+	return v, nil
+}
+func page(offset, limit, n int) (int, int) {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > n {
+		offset = n
+	}
+	if limit < 1 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	end := offset + limit
+	if end > n {
+		end = n
+	}
+	return offset, end
+}
+func (s *Store) Receivables(a protocol.Account, offset, limit int) []Receivable {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v := make([]Receivable, 0)
+	for _, r := range s.state.receivables {
+		if r.To == a {
+			v = append(v, r)
+		}
+	}
+	sort.Slice(v, func(i, j int) bool { return v[i].Source < v[j].Source })
+	start, end := page(offset, limit, len(v))
+	return v[start:end]
+}
+func copyRecord(r Record) Record { r.Votes = append([]Vote(nil), r.Votes...); return r }
+func (s *Store) History(a protocol.Account, offset, limit int) []Record {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v := make([]Record, 0)
+	for i := len(s.state.records) - 1; i >= 0; i-- {
+		r := s.state.records[i]
+		if r.Block.Account == a {
+			v = append(v, copyRecord(r))
+		}
+	}
+	start, end := page(offset, limit, len(v))
+	return v[start:end]
+}
+func (s *Store) Records(after uint64, limit int) []Record {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if after >= uint64(len(s.state.records)) {
+		return []Record{}
+	}
+	start, end := page(int(after), limit, len(s.state.records))
+	v := make([]Record, 0, end-start)
+	for _, r := range s.state.records[start:end] {
+		v = append(v, copyRecord(r))
+	}
+	return v
+}
+func (s *Store) Block(h protocol.Hash) (protocol.Block, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
+		return protocol.Block{}, ErrClosed
+	}
+	b, ok := s.state.blocks[h]
+	if !ok {
+		return protocol.Block{}, ErrNotFound
+	}
+	return b, nil
+}
+func (s *Store) Weights() map[protocol.Account]protocol.Amount {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.weights()
+}
+func (s *Store) Validate(b protocol.Block) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
+		return ErrClosed
+	}
+	if s.failed != nil {
+		return s.failed
+	}
+	return s.state.validate(b)
+}
+func (s *Store) Commit(r Record) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return ErrClosed
+	}
+	if s.failed != nil {
+		return s.failed
+	}
+	if r.Height <= uint64(len(s.state.records)) && r.Height > 0 {
+		existing := s.state.records[r.Height-1]
+		if existing.ID() == r.ID() {
+			return nil
+		}
+		return fmt.Errorf("%w: confirmed record cannot be replaced", ErrConflict)
+	}
+	r = copyRecord(r)
+	if e := s.state.validateRecord(r); e != nil {
+		return e
+	}
+	p, e := json.Marshal(r)
+	if e != nil {
+		return e
+	}
+	if e = s.journal.Append(p); e != nil {
+		s.failed = e
+		return e
+	}
+	s.state.apply(r)
+	return nil
+}
+func (s *Store) SaveSigningState(b []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.observerOnly {
+		return ErrObserverOnly
+	}
+	if s.closed {
+		return ErrClosed
+	}
+	if s.failed != nil {
+		return s.failed
+	}
+	if e := s.journal.SaveSigning(b); e != nil {
+		s.failed = e
+		return e
+	}
+	return nil
+}
+func (s *Store) SigningState() ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.observerOnly {
+		return nil, ErrObserverOnly
+	}
+	if s.closed {
+		return nil, ErrClosed
+	}
+	v, e := s.journal.Signing()
+	if errors.Is(e, os.ErrNotExist) {
+		return nil, ErrNotFound
+	}
+	return v, e
+}
+func (s *Store) Backup(w io.Writer) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.closed {
+		return ErrClosed
+	}
+	return s.journal.Backup(w)
+}
+
+// Restore imports a complete journal into an empty directory and independently replays
+// every certificate before publishing it. Signing state is deliberately never restored.
+func Restore(directory string, src io.Reader, g protocol.Genesis) error {
+	if e := g.Validate(); e != nil {
+		return e
+	}
+	if e := os.MkdirAll(filepath.Dir(directory), 0700); e != nil {
+		return e
+	}
+	if entries, e := os.ReadDir(directory); e == nil && len(entries) > 0 {
+		return errors.New("restore target must be empty")
+	} else if e != nil && !errors.Is(e, os.ErrNotExist) {
+		return e
+	}
+	stage, e := os.MkdirTemp(filepath.Dir(directory), ".restore-*")
+	if e != nil {
+		return e
+	}
+	defer os.RemoveAll(stage)
+	f, e := os.OpenFile(filepath.Join(stage, "ledger.wal"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		return e
+	}
+	_, e = io.Copy(f, src)
+	if e == nil {
+		e = f.Sync()
+	}
+	e = errors.Join(e, f.Close())
+	if e != nil {
+		return e
+	}
+	st, e := open(stage, g, true)
+	if e != nil {
+		return fmt.Errorf("invalid backup: %w", e)
+	}
+	if e = st.Close(); e != nil {
+		return e
+	}
+	// The same LOCK used by Open serializes restore against an active node.
+	if e = os.Mkdir(directory, 0700); e != nil && !errors.Is(e, os.ErrExist) {
+		return e
+	}
+	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR, 0600)
+	if e != nil {
+		return e
+	}
+	defer lock.Close()
+	if e = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
+		return fmt.Errorf("restore target locked: %w", e)
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	entries, e := os.ReadDir(directory)
+	if e != nil {
+		return e
+	}
+	for _, entry := range entries {
+		if entry.Name() != "LOCK" {
+			return errors.New("restore target became nonempty")
+		}
+	}
+	if e = storage.AtomicWrite(directory, "RESTORED", []byte("observer-only backup restore\n")); e != nil {
+		return e
+	}
+	if e = os.Rename(filepath.Join(stage, "ledger.wal"), filepath.Join(directory, "ledger.wal")); e != nil {
+		return e
+	}
+	return storage.SyncDirectory(directory)
+}
