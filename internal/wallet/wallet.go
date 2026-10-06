@@ -46,6 +46,7 @@ type envelope struct {
 // Create creates a new wallet and refuses to replace an existing path.
 func Create(path string, password []byte) (*Wallet, error) {
 	var seed [32]byte
+	defer clear(seed[:])
 	if _, err := rand.Read(seed[:]); err != nil {
 		return nil, fmt.Errorf("generate wallet seed: %w", err)
 	}
