@@ -52,7 +52,7 @@ func (e *Engine) remember(v ledger.Vote) {
 }
 func (e *Engine) acceptVote(v ledger.Vote) error {
 	status := e.cfg.Store.Status()
-	if v.Network != status.Network || v.Height != e.state.Height || v.Parent != status.Tip || uint64(v.Round) > uint64(e.state.Round)+32 || uint64(v.Round)+2 < uint64(e.state.Round) {
+	if v.Network != status.Network || v.Height != e.state.Height || v.Parent != status.Tip || uint64(v.Round)+2 < uint64(e.state.Round) {
 		return ErrStale
 	}
 	if e.weights[v.Representative] == 0 {
@@ -60,6 +60,30 @@ func (e *Engine) acceptVote(v ledger.Vote) error {
 	}
 	if err := v.Verify(); err != nil {
 		return err
+	}
+	if uint64(v.Round) > uint64(e.state.Round)+32 {
+		// Keep only the latest authenticated future vote per representative.
+		if old, ok := e.ahead[v.Representative]; !ok || v.Round >= old.Round {
+			e.ahead[v.Representative] = v
+		}
+		var w protocol.Amount
+		for rep, other := range e.ahead {
+			if other.Round == v.Round {
+				w += e.weights[rep]
+			}
+		}
+		if uint64(w) > uint64(status.Supply)/3 {
+			if err := e.advanceRound(v.Round); err != nil {
+				return err
+			}
+			for _, other := range e.ahead {
+				if other.Round == v.Round {
+					e.remember(other)
+				}
+			}
+			e.ahead = map[protocol.Account]ledger.Vote{}
+		}
+		return nil
 	}
 	if phases := e.votes[v.Round]; phases != nil {
 		if old, ok := phases[v.Phase][v.Representative]; ok {
@@ -195,6 +219,21 @@ func (e *Engine) drive() error {
 		if err := e.propose(); err != nil {
 			return err
 		}
+		// A late old-round quorum still informs later re-proposals; it does not
+		// authorize signing a precommit for a round that has already been left.
+		for oldRound, p := range e.proposals {
+			if oldRound <= e.state.Round && int64(oldRound) > e.state.ValidRound {
+				if proof, ok := e.proof(oldRound, "prevote", p.Block.ID()); ok {
+					b := p.Block
+					e.state.Valid = &b
+					e.state.ValidRound = int64(oldRound)
+					e.state.Proof = proof
+					if err := e.persist(); err != nil {
+						return err
+					}
+				}
+			}
+		}
 		r := e.state.Round
 		if p, ok := e.proposals[r]; ok && !e.hasSigned("prevote") {
 			hash := protocol.Hash("")
@@ -271,15 +310,13 @@ func (e *Engine) drive() error {
 					}
 				}
 			}
-			if quorum(weight, e.cfg.Store.Status().Supply) && round > highest {
+			if uint64(weight) > uint64(e.cfg.Store.Status().Supply)/3 && round > highest {
 				highest = round
 			}
 		}
 		if highest > r {
-			for e.state.Round < highest {
-				if err := e.roundNext(); err != nil {
-					return err
-				}
+			if err := e.advanceRound(highest); err != nil {
+				return err
 			}
 			continue
 		}
@@ -311,6 +348,7 @@ func (e *Engine) commit(r ledger.Record, broadcast bool) error {
 	oldRep := e.state.Representative
 	e.state = signingState{Version: 1, Network: status.Network, Representative: oldRep, Height: r.Height + 1, LockedRound: -1, ValidRound: -1, Signed: map[string]ledger.Vote{}}
 	e.weights = e.cfg.Store.Weights()
+	e.ahead = map[protocol.Account]ledger.Vote{}
 	e.votes = map[uint32]map[string]map[protocol.Account]ledger.Vote{}
 	e.proposals = map[uint32]Proposal{}
 	for id, b := range e.pending {

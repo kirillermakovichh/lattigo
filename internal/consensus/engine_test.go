@@ -201,3 +201,56 @@ func TestQuorumArithmetic(t *testing.T) {
 		}
 	}
 }
+
+func TestFutureRoundCatchupRequiresHonestWeight(t *testing.T) {
+	f := makeFixture(4)
+	e, s := openEngine(t, f, 3)
+	for i := 0; i < 2; i++ {
+		v := ledger.Vote{Network: f.genesis.ID(), Height: 1, Round: 1000, Phase: "prevote", Parent: s.Status().Tip, Representative: f.accounts[i]}
+		if err := v.Sign(f.keys[i]); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.Handle(Message{Type: "vote", Vote: &v}); err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 && e.state.Round != 0 {
+			t.Fatal("one Byzantine representative forced round advancement")
+		}
+	}
+	if e.state.Round != 1000 {
+		t.Fatalf("round=%d, want1000", e.state.Round)
+	}
+	if len(e.votes) > 1 {
+		t.Fatal("round catchup retained unbounded history")
+	}
+}
+func TestLatePrevoteCertificateSurvivesRoundChange(t *testing.T) {
+	f := makeFixture(4)
+	e, s := openEngine(t, f, 3)
+	b := sendBlock(t, f)
+	p := Proposal{Network: f.genesis.ID(), Height: 1, Round: 0, Parent: s.Status().Tip, Block: b, ValidRound: -1, Representative: f.accounts[0]}
+	if err := p.Sign(f.keys[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Handle(Message{Type: "proposal", Proposal: &p}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.roundNext(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		v := ledger.Vote{Network: f.genesis.ID(), Height: 1, Round: 0, Phase: "prevote", Parent: s.Status().Tip, Block: b.ID(), Representative: f.accounts[i]}
+		if err := v.Sign(f.keys[i]); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.Handle(Message{Type: "vote", Vote: &v}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if e.state.Valid == nil || e.state.Valid.ID() != b.ID() || e.state.ValidRound != 0 {
+		t.Fatal("late prevote certificate was lost")
+	}
+	if e.state.Locked != nil {
+		t.Fatal("late previous-round certificate created an old-round lock")
+	}
+}

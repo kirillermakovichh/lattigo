@@ -43,6 +43,7 @@ type signingState struct {
 type Engine struct {
 	lastBroadcast   time.Time
 	broadcastCursor int
+	ahead           map[protocol.Account]ledger.Vote
 	mu              sync.Mutex
 	cfg             Config
 	state           signingState
@@ -110,6 +111,10 @@ func New(cfg Config) (*Engine, error) {
 		e.state.Signed = map[string]ledger.Vote{}
 	}
 	e.weights = cfg.Store.Weights()
+	e.ahead = map[protocol.Account]ledger.Vote{}
+	if err = e.validateRecovered(); err != nil {
+		return nil, err
+	}
 	for _, v := range e.state.Signed {
 		e.remember(v)
 	}
@@ -318,21 +323,26 @@ func (e *Engine) roundNext() error {
 	if e.state.Round == math.MaxUint32 {
 		return errors.New("consensus round exhausted")
 	}
-	e.state.Round++
+	return e.advanceRound(e.state.Round + 1)
+}
+func (e *Engine) advanceRound(round uint32) error {
+	if round <= e.state.Round {
+		return nil
+	}
+	e.state.Round = round
 	e.state.Proposal = nil
 	for r := range e.votes {
-		if uint64(r)+2 < uint64(e.state.Round) {
+		if uint64(r)+2 < uint64(round) {
 			delete(e.votes, r)
 		}
 	}
 	for r := range e.proposals {
-		if uint64(r)+2 < uint64(e.state.Round) {
+		if uint64(r)+2 < uint64(round) {
 			delete(e.proposals, r)
 		}
 	}
-	// Old rounds cannot be revisited after persisted round advancement.
 	for k, v := range e.state.Signed {
-		if v.Round < e.state.Round {
+		if v.Round < round {
 			delete(e.state.Signed, k)
 		}
 	}
