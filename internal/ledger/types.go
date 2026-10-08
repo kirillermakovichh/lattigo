@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	ErrNotFound   = errors.New("not found")
-	ErrConflict   = errors.New("conflict")
-	ErrDependency = errors.New("missing dependency")
-	ErrInvalid    = errors.New("invalid")
-	ErrClosed     = errors.New("store closed")
+	ErrNotFound     = errors.New("not found")
+	ErrConflict     = errors.New("conflict")
+	ErrDependency   = errors.New("missing dependency")
+	ErrInvalid      = errors.New("invalid")
+	ErrClosed       = errors.New("store closed")
+	ErrObserverOnly = errors.New("restored ledger is observer-only; use a fresh signing identity in a fresh directory")
 )
 
 type AccountState struct {

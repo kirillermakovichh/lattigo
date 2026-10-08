@@ -3,7 +3,9 @@ package protocol
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -55,5 +57,27 @@ func TestAmountAndGenesis(t *testing.T) {
 	g.Allocations = append(g.Allocations, g.Allocations[0])
 	if g.Validate() == nil {
 		t.Fatal("duplicate allocation")
+	}
+}
+
+func TestIndependentCanonicalVector(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/protocol/send.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vector struct {
+		Block        Block  `json:"block"`
+		CanonicalHex string `json:"canonical_hex"`
+		ID           Hash   `json:"id"`
+	}
+	if err = json.Unmarshal(data, &vector); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := vector.Block.Canonical()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hex.EncodeToString(encoded) != vector.CanonicalHex || vector.Block.ID() != vector.ID {
+		t.Fatal("independent canonical vector mismatch")
 	}
 }
