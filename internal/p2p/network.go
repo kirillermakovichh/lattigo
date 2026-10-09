@@ -35,10 +35,12 @@ type Config struct {
 	MaxPeers int
 }
 type peer struct {
-	url       string
-	queue     chan []byte
-	connected atomic.Bool
-	height    atomic.Uint64
+	url           string
+	queue         chan []byte
+	connected     atomic.Bool
+	height        atomic.Uint64
+	queued        atomic.Int64
+	pendingCursor int
 }
 type rate struct {
 	tokens  float64
@@ -53,6 +55,7 @@ type Network struct {
 	stopped  atomic.Bool
 	dropped  atomic.Uint64
 	received atomic.Uint64
+	queued   atomic.Int64
 	mu       sync.Mutex
 	rates    map[string]rate
 }
@@ -129,9 +132,14 @@ func (n *Network) Publish(message consensus.Message) {
 		n.dropped.Add(1)
 		return
 	}
+	if !reserve(&n.queued, int64(len(raw)), 16<<20) {
+		n.dropped.Add(1)
+		return
+	}
 	select {
 	case n.out <- raw:
 	default:
+		n.queued.Add(-int64(len(raw)))
 		n.dropped.Add(1)
 	}
 }
@@ -148,10 +156,16 @@ func (n *Network) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case raw := <-n.out:
+			n.queued.Add(-int64(len(raw)))
 			for _, p := range n.peers {
+				if !reserve(&p.queued, int64(len(raw)), 8<<20) {
+					n.dropped.Add(1)
+					continue
+				}
 				select {
 				case p.queue <- raw:
 				default:
+					p.queued.Add(-int64(len(raw)))
 					n.dropped.Add(1)
 				}
 			}
@@ -168,6 +182,7 @@ func (n *Network) runPeer(ctx context.Context, p *peer) {
 		case <-ctx.Done():
 			return
 		case raw := <-p.queue:
+			p.queued.Add(-int64(len(raw)))
 			if err := n.request(ctx, p, "POST", "/p2p/message", raw, nil); err != nil {
 				p.connected.Store(false)
 			}
@@ -263,8 +278,13 @@ func (n *Network) syncPeer(ctx context.Context, p *peer) {
 		}
 	}
 	// Repair lost block gossip. Votes and proposals are retransmitted by consensus rounds.
-	for _, block := range n.cfg.Engine.Pending() {
-		b := block
+	pending := n.cfg.Engine.Pending()
+	for sent := 0; sent < len(pending) && sent < 32; sent++ {
+		if p.pendingCursor >= len(pending) {
+			p.pendingCursor = 0
+		}
+		b := pending[p.pendingCursor]
+		p.pendingCursor++
 		raw, err := json.Marshal(consensus.Message{Type: "block", Block: &b})
 		if err != nil {
 			continue
@@ -279,7 +299,7 @@ func (n *Network) syncPeer(ctx context.Context, p *peer) {
 func (n *Network) Syncing() bool {
 	height := n.cfg.Store.Status().Height
 	for _, p := range n.peers {
-		if p.connected.Load() && p.height.Load() > height {
+		if p.height.Load() > height {
 			return true
 		}
 	}
@@ -414,4 +434,17 @@ func (n *Network) message(w http.ResponseWriter, r *http.Request) {
 	}
 	n.received.Add(1)
 	respond(w, 202, map[string]bool{"accepted": true})
+}
+
+// reserve bounds retained bytes in addition to queue item counts.
+func reserve(counter *atomic.Int64, size, limit int64) bool {
+	for {
+		value := counter.Load()
+		if size > limit-value {
+			return false
+		}
+		if counter.CompareAndSwap(value, value+size) {
+			return true
+		}
+	}
 }

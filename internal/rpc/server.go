@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"example.com/go-block-lattice/internal/consensus"
 	"example.com/go-block-lattice/internal/ledger"
@@ -31,17 +33,18 @@ type Config struct {
 }
 
 type Server struct {
-	cfg      Config
-	slots    chan struct{}
-	requests atomic.Uint64
-	rejected atomic.Uint64
+	cfg        Config
+	slots      chan struct{}
+	backupSlot chan struct{}
+	requests   atomic.Uint64
+	rejected   atomic.Uint64
 }
 
 func New(cfg Config) (*Server, error) {
 	if cfg.Store == nil || cfg.Engine == nil {
 		return nil, errors.New("RPC requires ledger and consensus engine")
 	}
-	return &Server{cfg: cfg, slots: make(chan struct{}, 32)}, nil
+	return &Server{cfg: cfg, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1)}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -100,6 +103,10 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 }
 func classify(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, consensus.ErrBusy):
+		writeError(w, 503, "overloaded", err.Error())
+	case errors.Is(err, consensus.ErrStale):
+		writeError(w, 409, "stale", err.Error())
 	case errors.Is(err, ledger.ErrNotFound):
 		writeError(w, 404, "not_found", err.Error())
 	case errors.Is(err, ledger.ErrConflict):
@@ -246,11 +253,31 @@ func (s *Server) backup(w http.ResponseWriter, r *http.Request) {
 	if !s.authenticated(w, r) {
 		return
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="ledger.backup"`)
-	if err := s.cfg.Store.Backup(w); err != nil {
+	select {
+	case s.backupSlot <- struct{}{}:
+		defer func() { <-s.backupSlot }()
+	default:
+		writeError(w, 503, "overloaded", "another backup is in progress")
 		return
 	}
+	file, err := os.CreateTemp("", "bl-ledger-backup-*")
+	if err != nil {
+		writeError(w, 503, "backup_failed", "cannot create backup staging file")
+		return
+	}
+	defer func() { file.Close(); os.Remove(file.Name()) }()
+	// Stage before publishing headers so persistence failures cannot look like HTTP success.
+	if err := s.cfg.Store.Backup(file); err != nil {
+		writeError(w, 503, "backup_failed", "ledger backup failed")
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		writeError(w, 503, "backup_failed", "cannot read backup staging file")
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="ledger.backup"`)
+	http.ServeContent(w, r, "ledger.backup", time.Time{}, file)
 }
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	health := s.cfg.Engine.Health()
@@ -261,6 +288,13 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if value, ok := health["error"].(string); ok && value != "" {
 		ready = false
 	}
+	// While work waits, distinguish a responsive process from observed voting quorum.
+	observed, _ := health["observed_voting_weight"].(protocol.Amount)
+	quorum, _ := health["quorum_weight"].(protocol.Amount)
+	quorumObserved := quorum > 0 && observed >= quorum
+	if pending, ok := health["pending"].(int); ok && pending > 0 && !quorumObserved {
+		ready = false
+	}
 	syncing := s.cfg.Syncing != nil && s.cfg.Syncing()
 	if syncing {
 		ready = false
@@ -269,12 +303,23 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if !ready {
 		status = 503
 	}
-	writeJSON(w, status, map[string]any{"ready": ready, "syncing": syncing, "consensus": health})
+	writeJSON(w, status, map[string]any{"ready": ready, "syncing": syncing, "consensus": health, "quorum_observed": quorumObserved})
 }
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	state := s.cfg.Store.Status()
 	_, _ = fmt.Fprintf(w, "# TYPE bl_ledger_height gauge\nbl_ledger_height %d\n# TYPE bl_rpc_requests_total counter\nbl_rpc_requests_total %d\n# TYPE bl_rpc_rejected_total counter\nbl_rpc_rejected_total %d\n", state.Height, s.requests.Load(), s.rejected.Load())
+	health := s.cfg.Engine.Health()
+	for _, name := range []string{"pending", "round", "observed_voting_weight", "quorum_weight"} {
+		switch value := health[name].(type) {
+		case int:
+			_, _ = fmt.Fprintf(w, "bl_consensus_%s %d\n", name, value)
+		case uint32:
+			_, _ = fmt.Fprintf(w, "bl_consensus_%s %d\n", name, value)
+		case protocol.Amount:
+			_, _ = fmt.Fprintf(w, "bl_consensus_%s %d\n", name, uint64(value))
+		}
+	}
 	if s.cfg.PeerStats != nil {
 		stats := s.cfg.PeerStats()
 		if value, ok := stats.(map[string]any); ok {

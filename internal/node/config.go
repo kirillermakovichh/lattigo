@@ -102,8 +102,8 @@ func (c Config) Validate() error {
 	if c.RoundTimeoutMS < 100 || c.RoundTimeoutMS > 60000 {
 		return errors.New("round_timeout_ms must be 100..60000")
 	}
-	if c.MaxPending < 1 || c.MaxPending > 100000 {
-		return errors.New("max_pending must be 1..100000")
+	if c.MaxPending < 1 || c.MaxPending > 65536 {
+		return errors.New("max_pending must be 1..65536")
 	}
 	if c.MaxPeers < 1 || c.MaxPeers > 128 {
 		return errors.New("max_peers must be 1..128")
