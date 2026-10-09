@@ -120,3 +120,37 @@ func TestTornTailRecoveryAndCorruption(t *testing.T) {
 		t.Fatal("partial backup accepted")
 	}
 }
+
+func TestSigningStateLossAndCorruptionFailClosed(t *testing.T) {
+	state, _, _ := fixture(t)
+	dir := t.TempDir()
+	store, err := Open(dir, state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = store.SaveSigningState([]byte(`{"round":3}`)); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "signing.json")
+	if err = os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.SigningState(); err == nil || err == ErrNotFound {
+		t.Fatal("lost initialized signing state treated as fresh signer")
+	}
+	if err = store.SaveSigningState([]byte(`{"round":3}`)); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b[len(b)-1] ^= 1
+	if err = os.WriteFile(path, b, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.SigningState(); err == nil {
+		t.Fatal("signing state corruption accepted")
+	}
+	store.Close()
+}

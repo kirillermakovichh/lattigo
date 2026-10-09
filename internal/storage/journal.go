@@ -204,7 +204,26 @@ func (j *Journal) Backup(w io.Writer) error {
 	return e
 }
 func (j *Journal) Signing() ([]byte, error) {
-	return os.ReadFile(filepath.Join(j.directory, "signing.json"))
+	b, err := os.ReadFile(filepath.Join(j.directory, "signing.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		if _, markerErr := os.Stat(filepath.Join(j.directory, "SIGNER")); markerErr == nil {
+			return nil, errors.New("signing state lost after signer initialization; rollback recovery refused")
+		} else if !errors.Is(markerErr, os.ErrNotExist) {
+			return nil, markerErr
+		}
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(b) < 40 || len(b) > MaxFrame+40 || string(b[:8]) != "BLSIGN01" {
+		return nil, errors.New("invalid signing state envelope")
+	}
+	checksum := sha256.Sum256(b[40:])
+	if !bytes.Equal(checksum[:], b[8:40]) {
+		return nil, errors.New("signing state checksum mismatch")
+	}
+	return b[40:], nil
 }
 func (j *Journal) SaveSigning(b []byte) error {
 	if j.failed != nil {
@@ -213,8 +232,20 @@ func (j *Journal) SaveSigning(b []byte) error {
 	if len(b) == 0 || len(b) > MaxFrame {
 		return errors.New("invalid signing state size")
 	}
-	e := AtomicWrite(j.directory, "signing.json", b)
-	if e != nil {
+	// A permanent initialization marker makes later disappearance fail closed.
+	if _, e := os.Stat(filepath.Join(j.directory, "SIGNER")); errors.Is(e, os.ErrNotExist) {
+		if e = AtomicWrite(j.directory, "SIGNER", []byte("BL/signer/v1\n")); e != nil {
+			j.failed = fmt.Errorf("signer marker durability failure: %w", e)
+			return j.failed
+		}
+	} else if e != nil {
+		j.failed = e
+		return e
+	}
+	checksum := sha256.Sum256(b)
+	envelope := append([]byte("BLSIGN01"), checksum[:]...)
+	envelope = append(envelope, b...)
+	if e := AtomicWrite(j.directory, "signing.json", envelope); e != nil {
 		j.failed = fmt.Errorf("signing durability failure: %w", e)
 	}
 	return j.failed
