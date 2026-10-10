@@ -15,7 +15,13 @@ import (
 	"example.com/go-block-lattice/internal/storage"
 )
 
+const DefaultMaxHistoryBytes uint64 = 256 << 20
+
+type Options struct{ MaxHistoryBytes uint64 }
+
 type Store struct {
+	historyBytes uint64
+	historyLimit uint64
 	mu           sync.RWMutex
 	state        *state
 	journal      *storage.Journal
@@ -24,8 +30,19 @@ type Store struct {
 	observerOnly bool
 }
 
-func Open(directory string, g protocol.Genesis) (*Store, error) { return open(directory, g, false) }
-func open(directory string, g protocol.Genesis, strict bool) (*Store, error) {
+func Open(directory string, g protocol.Genesis) (*Store, error) {
+	return OpenWithOptions(directory, g, Options{})
+}
+func OpenWithOptions(directory string, g protocol.Genesis, options Options) (*Store, error) {
+	return open(directory, g, false, options)
+}
+func open(directory string, g protocol.Genesis, strict bool, options Options) (*Store, error) {
+	if options.MaxHistoryBytes == 0 {
+		options.MaxHistoryBytes = DefaultMaxHistoryBytes
+	}
+	if options.MaxHistoryBytes < 32<<20 || options.MaxHistoryBytes > 1<<40 {
+		return nil, errors.New("history limit must be 32MiB..1TiB")
+	}
 	if e := g.Validate(); e != nil {
 		return nil, e
 	}
@@ -35,13 +52,16 @@ func open(directory string, g protocol.Genesis, strict bool) (*Store, error) {
 	if e != nil {
 		return nil, e
 	}
-	s := &Store{state: newState(g)}
+	s := &Store{state: newState(g), historyLimit: options.MaxHistoryBytes}
 	if _, err := os.Stat(filepath.Join(directory, "RESTORED")); err == nil {
 		s.observerOnly = true
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	apply := func(p []byte) error {
+		if uint64(len(p)) > s.historyLimit-s.historyBytes {
+			return ErrCapacity
+		}
 		var r Record
 		if e := json.Unmarshal(p, &r); e != nil {
 			return e
@@ -50,6 +70,7 @@ func open(directory string, g protocol.Genesis, strict bool) (*Store, error) {
 			return e
 		}
 		s.state.apply(r)
+		s.historyBytes += uint64(len(p))
 		return nil
 	}
 	if strict {
@@ -82,7 +103,7 @@ func (s *Store) Status() Status {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	a := s.state
-	return Status{Network: a.genesis.ID(), Height: uint64(len(a.records)), Tip: a.tip, Supply: a.genesis.Supply, Accounts: len(a.accounts), Receivables: len(a.receivables)}
+	return Status{HistoryBytes: s.historyBytes, HistoryLimitBytes: s.historyLimit, CapacityReached: s.historyBytes+storage.MaxFrame > s.historyLimit, Network: a.genesis.ID(), Height: uint64(len(a.records)), Tip: a.tip, Supply: a.genesis.Supply, Accounts: len(a.accounts), Receivables: len(a.receivables)}
 }
 func (s *Store) Account(a protocol.Account) (AccountState, error) {
 	s.mu.RLock()
@@ -181,7 +202,14 @@ func (s *Store) Validate(b protocol.Block) error {
 	if s.failed != nil {
 		return s.failed
 	}
-	return s.state.validate(b)
+
+	if err := s.state.validate(b); err != nil {
+		return err
+	}
+	if _, exists := s.state.blocks[b.ID()]; !exists && s.historyBytes+storage.MaxFrame > s.historyLimit {
+		return ErrCapacity
+	}
+	return nil
 }
 func (s *Store) Commit(r Record) error {
 	s.mu.Lock()
@@ -207,11 +235,16 @@ func (s *Store) Commit(r Record) error {
 	if e != nil {
 		return e
 	}
+	if uint64(len(p)) > s.historyLimit-s.historyBytes {
+		s.failed = ErrCapacity
+		return ErrCapacity
+	}
 	if e = s.journal.Append(p); e != nil {
 		s.failed = e
 		return e
 	}
 	s.state.apply(r)
+	s.historyBytes += uint64(len(p))
 	return nil
 }
 func (s *Store) SaveSigningState(b []byte) error {
@@ -259,6 +292,11 @@ func (s *Store) Backup(w io.Writer) error {
 // Restore imports a complete journal into an empty directory and independently replays
 // every certificate before publishing it. Signing state is deliberately never restored.
 func Restore(directory string, src io.Reader, g protocol.Genesis) error {
+	return RestoreWithOptions(directory, src, g, Options{})
+}
+
+// RestoreWithOptions permits explicitly provisioned history capacity during import.
+func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, options Options) error {
 	if e := g.Validate(); e != nil {
 		return e
 	}
@@ -287,7 +325,7 @@ func Restore(directory string, src io.Reader, g protocol.Genesis) error {
 	if e != nil {
 		return e
 	}
-	st, e := open(stage, g, true)
+	st, e := open(stage, g, true, options)
 	if e != nil {
 		return fmt.Errorf("invalid backup: %w", e)
 	}
