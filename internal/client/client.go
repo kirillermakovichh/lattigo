@@ -184,13 +184,13 @@ func (c *Client) Submit(ctx context.Context, b protocol.Block) (Submission, erro
 	err := c.request(ctx, "POST", "/v1/blocks", b, &out)
 	if err != nil {
 		var rpcErr *Error
-		if !errors.As(err, &rpcErr) {
+		if !errors.As(err, &rpcErr) || rpcErr.Status >= 500 {
 			err = &SubmissionError{Hash: b.ID(), Cause: err}
 		}
 		return out, err
 	}
-	if out.Hash != b.ID() {
-		return out, &SubmissionError{Hash: b.ID(), Cause: errors.New("RPC returned mismatched block hash")}
+	if out.Hash != b.ID() || (out.Status != "admitted" && out.Status != "confirmed") {
+		return out, &SubmissionError{Hash: b.ID(), Cause: errors.New("RPC returned an invalid submission acknowledgement")}
 	}
 	return out, nil
 }
@@ -226,8 +226,8 @@ func (c *Client) Backup(ctx context.Context, dst io.Writer, maxBytes int64) erro
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("backup HTTP status %d", resp.StatusCode)
 	}
-	if maxBytes <= 0 {
-		return errors.New("backup byte limit must be positive")
+	if maxBytes <= 0 || maxBytes == int64(^uint64(0)>>1) {
+		return errors.New("backup byte limit must be positive and below int64 maximum")
 	}
 	n, err := io.Copy(dst, io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
