@@ -78,3 +78,22 @@ func TestCertificateRejectsDuplicationAndBinding(t *testing.T) {
 		t.Fatal("quorum rounding")
 	}
 }
+
+func TestSelfReceivePreservesDelegation(t *testing.T) {
+	s, key, other := fixture(t)
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Address(other.Public().(ed25519.PublicKey))
+	send := nextRecord(t, s, protocol.Block{Version: 1, Network: s.genesis.ID(), Kind: "send", Account: a, Representative: a, Balance: 60, Link: string(a)}, key)
+	if err := s.validateRecord(send); err != nil {
+		t.Fatal(err)
+	}
+	s.apply(send)
+	recv := nextRecord(t, s, protocol.Block{Version: 1, Network: s.genesis.ID(), Kind: "receive", Account: a, Previous: send.Block.ID(), Representative: b, Balance: 100, Link: string(send.Block.ID())}, key)
+	if err := s.validateRecord(recv); err != nil {
+		t.Fatal(err)
+	}
+	s.apply(recv)
+	if s.weights()[b] != 100 || s.weights()[a] != 0 {
+		t.Fatal("self receive duplicated voting weight")
+	}
+}

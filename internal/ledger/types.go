@@ -18,6 +18,7 @@ var (
 	ErrDependency   = errors.New("missing dependency")
 	ErrInvalid      = errors.New("invalid")
 	ErrClosed       = errors.New("store closed")
+	ErrCapacity     = errors.New("configured history capacity reached")
 	ErrObserverOnly = errors.New("restored ledger is observer-only; use a fresh signing identity in a fresh directory")
 )
 
@@ -140,12 +141,15 @@ func (r Record) ID() protocol.Hash {
 }
 
 type Status struct {
-	Network     protocol.Hash   `json:"network"`
-	Height      uint64          `json:"height"`
-	Tip         protocol.Hash   `json:"tip"`
-	Supply      protocol.Amount `json:"supply"`
-	Accounts    int             `json:"accounts"`
-	Receivables int             `json:"receivables"`
+	HistoryBytes      uint64          `json:"history_bytes"`
+	HistoryLimitBytes uint64          `json:"history_limit_bytes"`
+	CapacityReached   bool            `json:"capacity_reached"`
+	Network           protocol.Hash   `json:"network"`
+	Height            uint64          `json:"height"`
+	Tip               protocol.Hash   `json:"tip"`
+	Supply            protocol.Amount `json:"supply"`
+	Accounts          int             `json:"accounts"`
+	Receivables       int             `json:"receivables"`
 }
 
 // HasQuorum computes strict >2/3 without multiplying a possibly maximal supply.
@@ -155,7 +159,7 @@ func HasQuorum(weight, total protocol.Amount) bool {
 	return total > 0 && weight <= total && uint64(weight) > threshold
 }
 func certificate(r Record, network protocol.Hash, weights map[protocol.Account]protocol.Amount, total protocol.Amount) error {
-	if len(r.Votes) == 0 || len(r.Votes) > 16384 {
+	if len(r.Votes) == 0 || len(r.Votes) > protocol.MaxRepresentatives {
 		return fmt.Errorf("%w: certificate size", ErrInvalid)
 	}
 	seen := make(map[protocol.Account]bool, len(r.Votes))

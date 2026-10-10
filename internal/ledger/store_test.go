@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"crypto/ed25519"
+	"errors"
 	"example.com/go-block-lattice/internal/protocol"
 	"os"
 	"path/filepath"
@@ -153,4 +154,26 @@ func TestSigningStateLossAndCorruptionFailClosed(t *testing.T) {
 		t.Fatal("signing state corruption accepted")
 	}
 	store.Close()
+}
+
+func TestConfiguredHistoryCapacityStopsAdmission(t *testing.T) {
+	state, key, other := fixture(t)
+	store, err := OpenWithOptions(t.TempDir(), state.genesis, Options{MaxHistoryBytes: 32 << 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Address(other.Public().(ed25519.PublicKey))
+	block := nextRecord(t, state, protocol.Block{Version: 1, Network: state.genesis.ID(), Kind: "send", Account: a, Representative: a, Balance: 99, Link: string(b)}, key).Block
+	store.historyBytes = store.historyLimit - (16 << 20) + 1
+	if err = store.Validate(block); !errors.Is(err, ErrCapacity) {
+		t.Fatalf("capacity admission: %v", err)
+	}
+	if !store.Status().CapacityReached {
+		t.Fatal("capacity not exposed")
+	}
+	if _, err = OpenWithOptions(t.TempDir(), state.genesis, Options{MaxHistoryBytes: 1}); err == nil {
+		t.Fatal("impossible capacity accepted")
+	}
 }
