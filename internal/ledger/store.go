@@ -69,7 +69,7 @@ func open(directory string, g protocol.Genesis, strict bool, options Options) (*
 		if e := s.state.validateRecord(r); e != nil {
 			return e
 		}
-		s.state.apply(r)
+		s.state.apply(r, len(p))
 		s.historyBytes += uint64(len(p))
 		return nil
 	}
@@ -150,31 +150,70 @@ func (s *Store) Receivables(a protocol.Account, offset, limit int) []Receivable 
 	return v[start:end]
 }
 func copyRecord(r Record) Record { r.Votes = append([]Vote(nil), r.Votes...); return r }
+
+// History returns a reverse chronological page bounded by count and 16MiB of
+// serialized record payloads. A single valid record is always returned in full.
 func (s *Store) History(a protocol.Account, offset, limit int) []Record {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	v := make([]Record, 0)
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 1 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	out := make([]Record, 0)
+	seen := 0
+	bytes := uint64(2)
 	for i := len(s.state.records) - 1; i >= 0; i-- {
 		r := s.state.records[i]
-		if r.Block.Account == a {
-			v = append(v, copyRecord(r))
+		if r.Block.Account != a {
+			continue
+		}
+		if seen < offset {
+			seen++
+			continue
+		}
+		size := uint64(s.state.recordSizes[i]) + 1
+		if len(out) > 0 && bytes+size > 16<<20 {
+			break
+		}
+		out = append(out, copyRecord(r))
+		bytes += size
+		if len(out) >= limit {
+			break
 		}
 	}
-	start, end := page(offset, limit, len(v))
-	return v[start:end]
+	return out
 }
+
+// Records returns an ascending, byte-bounded certified bootstrap page.
 func (s *Store) Records(after uint64, limit int) []Record {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if after >= uint64(len(s.state.records)) {
 		return []Record{}
 	}
-	start, end := page(int(after), limit, len(s.state.records))
-	v := make([]Record, 0, end-start)
-	for _, r := range s.state.records[start:end] {
-		v = append(v, copyRecord(r))
+	if limit < 1 {
+		limit = 100
 	}
-	return v
+	if limit > 1000 {
+		limit = 1000
+	}
+	out := make([]Record, 0)
+	bytes := uint64(2)
+	for i := int(after); i < len(s.state.records) && len(out) < limit; i++ {
+		size := uint64(s.state.recordSizes[i]) + 1
+		if len(out) > 0 && bytes+size > 28<<20 {
+			break
+		}
+		out = append(out, copyRecord(s.state.records[i]))
+		bytes += size
+	}
+	return out
 }
 func (s *Store) Block(h protocol.Hash) (protocol.Block, error) {
 	s.mu.RLock()
@@ -243,7 +282,7 @@ func (s *Store) Commit(r Record) error {
 		s.failed = e
 		return e
 	}
-	s.state.apply(r)
+	s.state.apply(r, len(p))
 	s.historyBytes += uint64(len(p))
 	return nil
 }
