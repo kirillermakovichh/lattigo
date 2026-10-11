@@ -177,3 +177,35 @@ func TestConfiguredHistoryCapacityStopsAdmission(t *testing.T) {
 		t.Fatal("impossible capacity accepted")
 	}
 }
+
+func TestHistoryAndBootstrapPagesBoundCopiedBytes(t *testing.T) {
+	state, key, other := fixture(t)
+	store, err := Open(t.TempDir(), state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Address(other.Public().(ed25519.PublicKey))
+	for i := 0; i < 3; i++ {
+		account, _ := store.Account(a)
+		block := protocol.Block{Version: 1, Network: state.genesis.ID(), Kind: "send", Account: a, Previous: account.Frontier, Representative: a, Balance: account.Balance - 1, Link: string(b)}
+		r := nextRecord(t, store.state, block, key)
+		if err = store.Commit(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Inject size metadata to exercise budgets without allocating large certificates.
+	for i := range store.state.recordSizes {
+		store.state.recordSizes[i] = 10 << 20
+	}
+	if got := len(store.History(a, 0, 1000)); got != 1 {
+		t.Fatalf("history copied %d oversized records", got)
+	}
+	if got := len(store.Records(0, 1000)); got != 2 {
+		t.Fatalf("bootstrap copied %d oversized records", got)
+	}
+	if got := len(store.History(a, 2, 1000)); got != 1 {
+		t.Fatal("history offset lost")
+	}
+}
