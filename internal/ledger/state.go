@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"encoding/json"
 	"example.com/go-block-lattice/internal/protocol"
 	"fmt"
 	"math"
@@ -12,6 +13,7 @@ type state struct {
 	receivables map[protocol.Hash]Receivable
 	blocks      map[protocol.Hash]protocol.Block
 	records     []Record
+	recordSizes []uint32
 	tip         protocol.Hash
 }
 
@@ -125,7 +127,15 @@ func (s *state) validateRecord(r Record) error {
 	}
 	return certificate(r, s.genesis.ID(), s.weights(), s.genesis.Supply)
 }
-func (s *state) apply(r Record) {
+func (s *state) apply(r Record, serializedSize ...int) {
+	size := 0
+	if len(serializedSize) > 0 {
+		size = serializedSize[0]
+	} else {
+		encoded, _ := json.Marshal(r)
+		size = len(encoded)
+	}
+	s.recordSizes = append(s.recordSizes, uint32(size))
 	b := r.Block
 	a := s.accounts[b.Account]
 	switch b.Kind {
