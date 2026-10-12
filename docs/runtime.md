@@ -20,11 +20,16 @@ All unrecognized JSON fields are rejected. Defaults are shown below; genesis is 
   "round_timeout_ms": 2000,
   "max_pending": 1024,
   "max_peers": 32,
+  "history_limit_bytes": 268435456,
   "allow_remote_rpc": false
 }
 ```
 
 `BL_RPC_TOKEN` overrides the file token. An empty token makes RPC read-only.
+`history_limit_bytes` bounds the durable history indexed in memory (default 256 MiB,
+minimum 32 MiB, maximum 1 TiB). Reaching the bound stops admission and readiness;
+increase it only after provisioning corresponding RAM and disk, then restart.
+Status and metrics expose retained bytes and the configured bound.
 Use at least 16 characters for a local token and at least 32 for remote RPC.
 Remote RPC additionally requires `allow_remote_rpc=true`. The HTTP listener does not
 terminate TLS; use an authenticated TLS proxy on untrusted networks.
@@ -79,13 +84,17 @@ followed automatically. This deliberately avoids peer-driven arbitrary URL fetch
 HTTP redirects and ambient proxy settings are disabled. Configure HTTPS peer URLs
 when transport confidentiality or server authentication is required.
 
-P2P bodies are at most 4 MiB and fetched responses at most 8 MiB. There are at most
+P2P bodies are at most 20 MiB and fetched responses at most 32 MiB. There are at most
 16 simultaneous inbound handlers. Per-source admission allows 50 requests/second
 with a burst of 100; the source table retains at most 4096 entries.
 Configured peers default to 32 and cannot exceed 128. Outbound broadcasts are
-nonblocking with a global 256-message/16-MiB queue and a 32-message/8-MiB queue per peer.
+nonblocking with a global 256-message/32-MiB queue and a 32-message/24-MiB queue per peer.
 Saturated gossip is dropped and counted. Certified-record polling and pending-block
 retransmission (at most 32 pending blocks per peer tick) repair lost gossip. A slow peer has its own worker and HTTP deadlines.
+Record pages enforce byte and count limits while encoding each record separately;
+a record count cannot force allocation of an entire history-sized JSON response.
+Pages that fail the response budget are retried as one certified record.
+Transport limits exceed the maximum 16-MiB durable certificate frame.
 Catchup never calls ledger commit without consensus validation.
 
 ## Lifecycle
@@ -99,3 +108,11 @@ An isolated node cannot infer unseen network progress from its own ledger height
 SIGINT or SIGTERM stops admission, drains HTTP handlers for up to ten seconds,
 cancels owned background workers, joins them, and closes durable state.
 An expired drain deadline is an error; open connections are closed before storage release.
+
+## Resource provisioning
+
+For the default 32-peer configuration, provision at least 8 GiB RAM for conservative
+headroom under saturating input and maximum-size certificates. This is an engineering
+recommendation from configured bounds, not a measured throughput or memory guarantee.
+Increasing peer count or retained history raises the required memory budget.
+Monitor retained-history bytes, queue bytes and rejected requests under your workload.

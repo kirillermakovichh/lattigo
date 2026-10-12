@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"example.com/go-block-lattice/internal/ledger"
 	"example.com/go-block-lattice/internal/p2p"
 )
 
@@ -30,9 +31,13 @@ type Config struct {
 	MaxPending        int      `json:"max_pending"`
 	MaxPeers          int      `json:"max_peers"`
 	AllowRemoteRPC    bool     `json:"allow_remote_rpc"`
+	HistoryLimitBytes uint64   `json:"history_limit_bytes"`
 }
 
 func (c *Config) defaults() {
+	if c.HistoryLimitBytes == 0 {
+		c.HistoryLimitBytes = ledger.DefaultMaxHistoryBytes
+	}
 	if c.DataDir == "" {
 		c.DataDir = ".local/node"
 	}
@@ -93,6 +98,9 @@ func LoadConfig(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.HistoryLimitBytes != 0 && (c.HistoryLimitBytes < 32<<20 || c.HistoryLimitBytes > 1<<40) {
+		return errors.New("history_limit_bytes must be 33554432..1099511627776")
+	}
 	if c.Genesis == "" {
 		return errors.New("genesis file is required")
 	}
