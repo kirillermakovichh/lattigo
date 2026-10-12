@@ -103,6 +103,8 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 }
 func classify(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, ledger.ErrCapacity):
+		writeError(w, 503, "capacity_reached", err.Error())
 	case errors.Is(err, consensus.ErrBusy):
 		writeError(w, 503, "overloaded", err.Error())
 	case errors.Is(err, consensus.ErrStale):
@@ -281,9 +283,9 @@ func (s *Server) backup(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	health := s.cfg.Engine.Health()
-	ready := true
+	ready := !s.cfg.Store.Status().CapacityReached
 	if value, ok := health["ready"].(bool); ok {
-		ready = value
+		ready = ready && value
 	}
 	if value, ok := health["error"].(string); ok && value != "" {
 		ready = false
@@ -309,6 +311,7 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	state := s.cfg.Store.Status()
 	_, _ = fmt.Fprintf(w, "# TYPE bl_ledger_height gauge\nbl_ledger_height %d\n# TYPE bl_rpc_requests_total counter\nbl_rpc_requests_total %d\n# TYPE bl_rpc_rejected_total counter\nbl_rpc_rejected_total %d\n", state.Height, s.requests.Load(), s.rejected.Load())
+	_, _ = fmt.Fprintf(w, "bl_ledger_history_bytes %d\nbl_ledger_history_limit_bytes %d\n", state.HistoryBytes, state.HistoryLimitBytes)
 	health := s.cfg.Engine.Health()
 	for _, name := range []string{"pending", "round", "observed_voting_weight", "quorum_weight"} {
 		switch value := health[name].(type) {
@@ -323,7 +326,7 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.PeerStats != nil {
 		stats := s.cfg.PeerStats()
 		if value, ok := stats.(map[string]any); ok {
-			for _, name := range []string{"peers", "connected", "dropped", "received"} {
+			for _, name := range []string{"peers", "connected", "dropped", "received", "queued_bytes"} {
 				if n, ok := value[name].(int); ok {
 					_, _ = fmt.Fprintf(w, "bl_p2p_%s %d\n", name, n)
 				}

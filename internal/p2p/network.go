@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	maxMessage      = 4 << 20
-	maxResponse     = 8 << 20
+	maxMessage      = 20 << 20
+	maxResponse     = 32 << 20
 	protocolVersion = "1"
 )
 
@@ -132,7 +132,7 @@ func (n *Network) Publish(message consensus.Message) {
 		n.dropped.Add(1)
 		return
 	}
-	if !reserve(&n.queued, int64(len(raw)), 16<<20) {
+	if !reserve(&n.queued, int64(len(raw)), 32<<20) {
 		n.dropped.Add(1)
 		return
 	}
@@ -158,7 +158,7 @@ func (n *Network) Run(ctx context.Context) error {
 		case raw := <-n.out:
 			n.queued.Add(-int64(len(raw)))
 			for _, p := range n.peers {
-				if !reserve(&p.queued, int64(len(raw)), 8<<20) {
+				if !reserve(&p.queued, int64(len(raw)), 24<<20) {
 					n.dropped.Add(1)
 					continue
 				}
@@ -254,8 +254,12 @@ func (n *Network) syncPeer(ctx context.Context, p *peer) {
 	if status.Height > local.Height {
 		var records []ledger.Record
 		if err := n.request(ctx, p, "GET", "/p2p/records?after="+strconv.FormatUint(local.Height, 10)+"&limit=16", nil, &records); err != nil {
-			p.connected.Store(false)
-			return
+			// A maximum-size certificate fits individually even when a page does not.
+			records = nil
+			if err := n.request(ctx, p, "GET", "/p2p/records?after="+strconv.FormatUint(local.Height, 10)+"&limit=1", nil, &records); err != nil {
+				p.connected.Store(false)
+				return
+			}
 		}
 		if len(records) > 16 {
 			p.connected.Store(false)
@@ -312,7 +316,11 @@ func (n *Network) Stats() any {
 			connected++
 		}
 	}
-	return map[string]any{"peers": len(n.peers), "connected": connected, "dropped": int(n.dropped.Load()), "received": int(n.received.Load())}
+	queued := n.queued.Load()
+	for _, p := range n.peers {
+		queued += p.queued.Load()
+	}
+	return map[string]any{"peers": len(n.peers), "connected": connected, "dropped": int(n.dropped.Load()), "received": int(n.received.Load()), "queued_bytes": int(queued)}
 }
 
 func (n *Network) allow(remote string) bool {
@@ -407,11 +415,33 @@ func (n *Network) records(w http.ResponseWriter, r *http.Request) {
 	if records == nil {
 		records = []ledger.Record{}
 	}
-	raw, err := json.Marshal(records)
-	if err != nil || len(raw) > maxResponse {
-		respond(w, 413, map[string]string{"error": "record page exceeds limit; request fewer records"})
-		return
+	// Encode one record at a time so a high-count request cannot allocate an
+	// entire history-sized JSON page before enforcing the transport byte limit.
+	raw := make([]byte, 0, 64<<10)
+	raw = append(raw, '[')
+	for _, record := range records {
+		encoded, err := json.Marshal(record)
+		if err != nil {
+			respond(w, 500, map[string]string{"error": "cannot encode certified record"})
+			return
+		}
+		overhead := 1
+		if len(raw) > 1 {
+			overhead++
+		}
+		if len(encoded) > maxResponse-len(raw)-overhead {
+			if len(raw) == 1 {
+				respond(w, 413, map[string]string{"error": "certified record exceeds transport limit"})
+				return
+			}
+			break
+		}
+		if len(raw) > 1 {
+			raw = append(raw, ',')
+		}
+		raw = append(raw, encoded...)
 	}
+	raw = append(raw, ']')
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(raw)
 }

@@ -37,7 +37,7 @@ func Run(ctx context.Context, cfg Config) error {
 			key[i] = 0
 		}
 	}()
-	store, err := ledger.Open(cfg.DataDir, genesis)
+	store, err := ledger.OpenWithOptions(cfg.DataDir, genesis, ledger.Options{MaxHistoryBytes: cfg.HistoryLimitBytes})
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
 	}
