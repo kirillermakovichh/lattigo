@@ -140,3 +140,15 @@ Offline inspect/verify acquire the data lock and replay the ledger. Stop the nod
 Restore refuses a nonempty target and verifies the backup against the supplied genesis.
 Restored data is **observer-only**: a ledger backup is not authorization to roll back or
 reactivate an old representative signing identity. Do not clone active signing keys.
+
+## Full CLI/network check
+
+Run `python3 tests/network_smoke.py` to build temporary binaries and exercise one complete
+local scenario. Use `--binary-dir bin` to exercise already-built release binaries.
+The script generates random identities and credentials, launches four representative
+processes, confirms send/receive/delegation, checks idempotent retry and unauthorized
+write rejection, takes one representative offline, verifies restart catch-up, streams a
+backup, restores an observer and confirms another transfer across all five processes.
+It uses bounded deadlines and cleans up child processes and temporary secrets.
+This scenario passed at confirmed height 5 with recipient balance 30 raw units. It is
+a functional integration check, not an external review or sustained capacity benchmark.
