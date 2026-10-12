@@ -12,6 +12,9 @@ import (
 	"strings"
 )
 
+// MaxRepresentatives bounds certificate work and is part of protocol version 1.
+const MaxRepresentatives = 16384
+
 type Hash string
 type Account string
 type Amount uint64

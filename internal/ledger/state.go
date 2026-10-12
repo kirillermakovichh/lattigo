@@ -75,7 +75,43 @@ func (s *state) validate(b protocol.Block) error {
 	default:
 		return fmt.Errorf("%w: unsupported block kind", ErrInvalid)
 	}
+
+	if !s.representativeCapacity(b, a, exists) {
+		return fmt.Errorf("%w: maximum active representatives exceeded", ErrInvalid)
+	}
 	return nil
+}
+
+// representativeCapacity evaluates the next weight view without mutating state.
+func (s *state) representativeCapacity(b protocol.Block, a AccountState, exists bool) bool {
+	weights := s.weights()
+	owned := a.Balance
+	for _, r := range s.receivables {
+		if r.From == b.Account {
+			owned += r.Amount
+		}
+	}
+	if exists {
+		weights[a.Representative] -= owned
+	}
+	nextOwned := owned
+	if b.Kind == "receive" {
+		r := s.receivables[protocol.Hash(b.Link)]
+		if r.From != b.Account {
+			fromRep := s.accounts[r.From].Representative
+			weights[fromRep] -= r.Amount
+			nextOwned += r.Amount
+		}
+	}
+	// Sending changes balance to an outgoing receivable, preserving the sender's weight.
+	weights[b.Representative] += nextOwned
+	count := 0
+	for _, w := range weights {
+		if w > 0 {
+			count++
+		}
+	}
+	return count <= protocol.MaxRepresentatives
 }
 func (s *state) validateRecord(r Record) error {
 	if r.Height != uint64(len(s.records))+1 || r.Previous != s.tip {
