@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_RESPONSE = 8 << 20
+MAX_RESPONSE = 32 << 20
 
 
 def rpc(origin, path, body=None, token=None, expected=200):

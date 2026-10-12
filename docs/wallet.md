@@ -124,7 +124,9 @@ Submit the exact saved file from a connected machine using `submit --file`.
 
 `status`, `account`, `history`, `receivables` and `block` print structured JSON.
 Queries accepting `--address` do not require opening a wallet. History/receivables support
-`--offset` and `--limit` (1..1000). Responses are bounded and redirects are disabled.
+`--offset` and `--limit` (1..1000). RPC responses are bounded to 32 MiB so a valid
+certificate-bearing history page fits; redirects are disabled. Status includes optional
+`history_bytes`, `history_limit_bytes` and `capacity_reached` fields when reported by the node.
 
 ```sh
 bin/blctl status

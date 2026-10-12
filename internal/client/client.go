@@ -16,7 +16,8 @@ import (
 	"example.com/go-block-lattice/internal/protocol"
 )
 
-const MaxResponseBytes = 8 << 20
+// MaxResponseBytes accommodates a full certificate-bearing history page while bounding memory.
+const MaxResponseBytes = 32 << 20
 
 type Client struct {
 	base  string
@@ -45,12 +46,15 @@ func (e *SubmissionError) Error() string {
 func (e *SubmissionError) Unwrap() error { return e.Cause }
 
 type Status struct {
-	Network     protocol.Hash   `json:"network"`
-	Height      uint64          `json:"height"`
-	Tip         protocol.Hash   `json:"tip"`
-	Supply      protocol.Amount `json:"supply"`
-	Accounts    int             `json:"accounts"`
-	Receivables int             `json:"receivables"`
+	Network           protocol.Hash   `json:"network"`
+	Height            uint64          `json:"height"`
+	Tip               protocol.Hash   `json:"tip"`
+	Supply            protocol.Amount `json:"supply"`
+	Accounts          int             `json:"accounts"`
+	Receivables       int             `json:"receivables"`
+	HistoryBytes      uint64          `json:"history_bytes,omitempty"`
+	HistoryLimitBytes uint64          `json:"history_limit_bytes,omitempty"`
+	CapacityReached   bool            `json:"capacity_reached,omitempty"`
 }
 type AccountState struct {
 	Account        protocol.Account `json:"account"`
@@ -110,7 +114,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 		return err
 	}
 	if len(data) > MaxResponseBytes {
-		return errors.New("RPC response exceeds 8 MiB limit")
+		return fmt.Errorf("RPC response exceeds %d MiB limit", MaxResponseBytes>>20)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var v struct {
