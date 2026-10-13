@@ -17,12 +17,17 @@ All work is local; no remote, push, public genesis distribution or deployment oc
 ## Integrated verification
 
 - make check: passed on merged implementation (formatting, vet, package tests and race detector).
-- Documentation link check:47 relative file links passed; anchors/remote URLs excluded.
+- Final documentation link check:49 relative file links passed; anchors/remote URLs excluded.
 - make binaries / go build ./...: passed before final packaging boundary.
 - Agent-run real-process scenario: passed with four representatives and a restored observer;
   send/receive/delegation, duplicate retry, token rejection, quorum with one offline,
   restart catchup, live backup/restore and further certified observer synchronization.
-- Final archive build/reproducibility and archive-binary smoke checks are pending this checkpoint.
+- Four Linux/macOS amd64/arm64 archives built successfully from committed source9b1faea.
+- Second build reproduced all four archives byte-for-byte.
+- Extracted darwin/arm64 blnode/blwallet/blctl versions matched source9b1faea.
+- Final archive-binary smoke scenario passed:4 representatives,1 restored observer,
+  height5, recipient balance30, all nine declared scenarios.
+- Detailed observed results and checksums are in release/verification.md.
 - CI workflow configured; no remote CI result is claimed.
 
 ## Scope and limitations
@@ -41,6 +46,7 @@ local test results. A public module destination/ticker requires an actual mainta
 
 ## Next work
 
-Finish local packaging and integrated archive execution, record exact results, then leave a
-clean committed tree. Subsequent work should target the explicitly outstanding release
-qualification instead of rebuilding completed payment/consensus features.
+Local implementation and integration are complete. Subsequent work should target the
+explicitly outstanding release qualification instead of rebuilding completed payment,
+consensus, networking or wallet features. Preserve regular coherent commits.
+Do not launch or publish a public network without an explicit deployment instruction.
