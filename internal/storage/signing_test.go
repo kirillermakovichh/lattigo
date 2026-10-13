@@ -28,3 +28,29 @@ func TestSigningStateHasIndependentTwoCertificateBudget(t *testing.T) {
 		t.Fatal("unbounded signing state accepted")
 	}
 }
+
+func TestJournalIOFailureLatchesAcrossWritesAndBackup(t *testing.T) {
+	journal, err := Open(t.TempDir(), []byte("failure-test-genesis"), func([]byte) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journal.Close()
+	// A revoked file descriptor deterministically exercises the write-error path
+	// without relying on filesystem permissions or filling the host disk.
+	if err = journal.file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	first := journal.Append([]byte("must not be acknowledged"))
+	if first == nil {
+		t.Fatal("failed write reported success")
+	}
+	if err = journal.Append([]byte("retry")); err != first {
+		t.Fatal("failed journal resumed writes")
+	}
+	if err = journal.SaveSigning([]byte("vote")); err != first {
+		t.Fatal("failed journal allowed signing")
+	}
+	if err = journal.Backup(&bytes.Buffer{}); err != first {
+		t.Fatal("failed journal produced backup")
+	}
+}
