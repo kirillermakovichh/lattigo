@@ -42,7 +42,7 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 ## BL-004: Resolve Nano compatibility scope
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-002.
 
@@ -52,9 +52,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Trace each adopted rule to a pinned source; review ADR status. Resolve Q-01.
 
+**Implementation evidence:** Independent-network decision accepted in ADR-0002; scoped Nano revision comparison pinned in docs/research/nano.md.
+
+
 ## BL-005: Specify canonical blocks and signing
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-004.
 
@@ -64,9 +67,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Cross-check vectors against an independent implementation; reject noncanonical encodings.
 
+**Implementation evidence:** Canonical/hash vector independently calculated and checked; standard Ed25519 implementation used. No Nano format equivalence claimed.
+
+
 ## BL-006: Model representative safety and liveness
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-004.
 
@@ -76,9 +82,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Replay partition, re-delegation, equivocation and stale-weight traces. Split model tasks before coding if needed.
 
+**Implementation evidence:** Executable engine and weighted/adversarial scheduled traces implemented. These traces are not exhaustive model checking or a formal proof.
+
+
 ## BL-007: Implement canonical protocol primitives
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-005.
 
@@ -88,9 +97,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Known-answer tests, overflow tests, fuzz seeds and make check.
 
+**Implementation evidence:** internal/protocol and canonical vector shipped; signature/work/amount tests implemented.
+
+
 ## BL-008: Implement local account transitions
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-007.
 
@@ -100,9 +112,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Deterministic transition and conflict tests through the ledger interface; make check.
 
+**Implementation evidence:** Account transitions, exact-once receivables, dependency rejection and delegated-weight invariants implemented.
+
+
 ## BL-009: Select durable storage contract
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-008.
 
@@ -112,9 +127,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Focused durability experiment and recorded decision; no unsupported durability claims.
 
+**Implementation evidence:** ADR-0004 compares standard-library WAL trade-offs with embedded databases; capacity and restore policy explicit.
+
+
 ## BL-010: Persist a payment across restart
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-009.
 
@@ -124,9 +142,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Process-kill and interrupted-transaction tests; reopen and verify conservation; make check.
 
+**Implementation evidence:** WAL replay, torn tail, corruption, fsync, locking, checksummed signing and real restart/backup implemented.
+
+
 ## BL-011: Prevent conflicting representative signatures
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-006, BL-010.
 
@@ -136,9 +157,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Crash at each signing boundary and replay conflicting requests; make check.
 
+**Implementation evidence:** Durable signing envelope/marker and restart/equivocation regressions implemented; supported restore is observer-only.
+
+
 ## BL-012: Confirm account-chain dependencies
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-011.
 
@@ -148,9 +172,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Model trace conformance, replay, partitions and dependency tests; make check.
 
+**Implementation evidence:** Two-phase certificates, lock persistence, late proofs, round catchup and dependency validation implemented.
+
+
 ## BL-013: Define bounded network admission
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-005, BL-006.
 
@@ -160,9 +187,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Malformed-input and flood workload design; resource budget review before transport coding.
 
+**Implementation evidence:** Configured peers, proof-of-work and bounded HTTP/queue byte/item budgets implemented; sustained economic fairness remains BL-020 qualification.
+
+
 ## BL-014: Exchange blocks between bounded peers
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-012, BL-013.
 
@@ -172,9 +202,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Local multi-process exchange, slow-peer, overload and joined-shutdown scenarios; make check.
 
+**Implementation evidence:** P2P, node lifecycle, bounded gossip and joined shutdown implemented; real HTTP and process scenarios added.
+
+
 ## BL-015: Bootstrap verified state
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-014.
 
@@ -184,9 +217,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Malicious frontier, missing dependency, interrupted bootstrap and fresh-node catch-up tests.
 
+**Implementation evidence:** Certified replay from explicit genesis implemented; restored observer catches up after further confirmations.
+
+
 ## BL-016: Expose versioned payment RPC
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-012.
 
@@ -196,9 +232,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Contract tests for uncertain submission, retries, malformed requests and authorization; make check.
 
+**Implementation evidence:** Versioned raw JSON RPC, bearer writes/admin, bounded pagination, explicit statuses and retry semantics implemented.
+
+
 ## BL-017: Create and restore local wallet identities
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-005.
 
@@ -208,9 +247,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Known derivation vectors, wrong-password, backup round-trip and failure tests; make check.
 
+**Implementation evidence:** Encrypted deterministic wallet custody, exclusive private file creation and backup/restore implemented.
+
+
 ## BL-018: Deliver CLI payment workflows
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-016, BL-017.
 
@@ -220,9 +262,12 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Packaged CLI workflow tests including timeout/lookup/retry; make check.
 
+**Implementation evidence:** Wallet/control/node binaries implement online/offline flows; durable outbox preserves uncertain intent.
+
+
 ## BL-019: Verify backup, migration and operator visibility
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-015, BL-016.
 
@@ -231,6 +276,9 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 **Acceptance:** Operators can diagnose sync/quorum/storage states, restore consistent data and perform supported upgrades.
 
 **Verification:** Restore drill, interrupted migration, disk failure and readiness tests; split scenarios into separate tasks before implementation.
+
+**Implementation evidence:** Readiness/metrics, consistent backups, certified restore and compatible-upgrade procedures implemented. Injected descriptor failure checks fail-closed I/O; real hardware power-loss/full-disk drills remain release qualification.
+
 
 ## BL-020: Demonstrate adversarial multi-node operation
 
@@ -244,6 +292,9 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Verification:** Transfer/conservation, conflicts, partitions, restarts and bounded-resource evidence from packaged processes.
 
+**Implementation evidence:** Implemented baseline: adversarial partition/locked restart test and generated-key multi-process scenario. Still pending sustained hostile load, measured hardware budgets and long-duration operation.
+
+
 ## BL-021: Prepare product release evidence
 
 - [ ] Complete
@@ -255,3 +306,5 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 **Acceptance:** Resolve Q-04 distribution, Q-09 and Q-10; complete independent review, packaging, license inventory and all release requirements.
 
 **Verification:** Clean install, checksums, upgrade/restore and full workflow evidence; public deployment remains a separate action.
+
+**Implementation evidence:** Implemented baseline: reproducible archives, checksums, manifests, version output and license. External independent review, public distribution and public governance/launch decisions remain outstanding.

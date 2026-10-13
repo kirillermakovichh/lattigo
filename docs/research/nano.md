@@ -18,3 +18,14 @@ local differences and limitations. Inspect the current code when prose and histo
 Do not substitute generic Ed25519, arbitrary quorum thresholds or Bitcoin reorganization
 rules for Nano-specific behavior while claiming compatibility.
 Before copying implementation code, review its license and preserve attribution.
+
+## Pinned comparison during implementation
+
+Reference revision: `229e5a040a4a2c59ccc9d0d013fe8118e0c69ec4` (2026-11-14).
+Inspected nano/lib/blocks.hpp and the beginning of nano/node/election.cpp at that
+revision to compare dependency and election structure. This is a scoped comparison,
+not a full audit. Nano exposes qualified-root elections, online representative tracking
+and final cementing. This implementation instead uses a globally ordered two-phase
+certificate sequence, fixed-supply quorum and standard Ed25519/SHA256 formats.
+No Nano implementation code was copied into the runtime. The local independent design
+is specified in protocol.md and does not inherit Nano's security claims or compatibility.

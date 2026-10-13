@@ -1,6 +1,6 @@
 # Product requirements
 
-Status: initial product baseline. Nano-inspired architecture, Go, complete-product target
+Status: implemented product scope with outstanding external release qualification. Nano-inspired architecture, Go, complete-product target
 and organized development are user requirements. The scope below translates that target
 into reviewable requirements. Open choices remain in open-questions.md.
 
@@ -26,8 +26,8 @@ Integrators submit signed blocks and query balances, history and confirmation th
 | Operations | Config validation, readiness, logs, metrics, backup/restore and upgrade guidance |
 | Delivery | Reproducible release procedure, checksums, compatibility matrix and release evidence |
 
-The proposed payment policy is feeless transfers. Anti-spam and fair resource admission
-must be specified and measured before this policy becomes an accepted network contract.
+The implemented payment policy is feeless transfers with per-block proof-of-work and
+bounded admission. Economic fairness under sustained adversarial pressure still requires measurement.
 No throughput or finality latency is promised before reproducible measurements.
 
 ## User workflows

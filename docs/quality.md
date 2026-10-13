@@ -1,7 +1,9 @@
 # Verification and release requirements
 
-Status: required evidence plan. No product-level checks have run because product code is absent.
-A green bootstrap check only verifies repository infrastructure.
+Status: implemented verification baseline with external release qualification outstanding.
+Package checks and the generated-key multi-process scenario exercise actual product code.
+The final integrated command results are recorded in tasks/implementation-progress.md.
+Specific regression scenarios are evidence, not an exhaustive correctness proof.
 
 ## Verification layers
 
@@ -40,3 +42,23 @@ Publish source revision, build environment, checksums, dependency/license invent
 known limitations, network parameters and operator instructions.
 Do not promise a numerical TPS, finality latency or soak duration before its acceptance
 threshold and workload are agreed and recorded.
+
+## Current evidence and outstanding qualification
+
+The suite covers independent block digest vectors, exact amounts, invalid certificates,
+transfer/weight conservation, self-receive delegation, restart and backup, torn/corrupt WAL,
+lost/corrupt signing state, capacity and byte pagination, encrypted restore, outbox signing,
+authorization, peer-origin restrictions, real HTTP catchup and joined handler shutdown.
+Consensus scenarios include weighted send/receive, quorum arithmetic, missing quorum,
+late certificates, authenticated future-round catchup and an equivocating proposer with
+partitioned votes plus a locked representative restart.
+The optional network smoke scenario runs four representative binaries and a restored
+observer through real CLI flows and certified synchronization.
+
+Not yet evidenced: a long-duration hostile public deployment, exhaustive scheduler/model
+exploration, independent external cryptographic/consensus review, hardware/disk-loss drills,
+load-based fairness qualification and a public-network distribution/governance ceremony.
+No numerical public throughput/finality claim or external-audit claim is made.
+Keep BL-020/BL-021 open for those requirements instead of checking them off because the
+executables compile. Binaries and reproducible archives are delivered independently of
+public-network launch authorization.

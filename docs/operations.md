@@ -1,7 +1,7 @@
 # Operator requirements
 
-Status: design requirements, not executable deployment instructions.
-No node binary, ports, configuration schema or production network exists yet.
+Status: maintained operator policy. Executable commands and configuration live in
+runtime.md and wallet.md. No predefined public network is shipped.
 
 ## Configuration and isolation
 
@@ -34,4 +34,15 @@ Document supported upgrade paths, database migrations, protocol activation and d
 During suspected conflicting confirmation, preserve evidence and stop unsafe signing.
 During disk failure, stop admitting work that requires unavailable durability.
 Do not conceal uncertainty behind a healthy status or automatic reset.
-Concrete commands, configuration examples and service definitions will accompany implemented behavior.
+Use blctl backup for an authenticated consistent journal and blctl restore for an
+empty observer-only data directory. Stop a node before offline inspect/verify.
+Compatible binary upgrades: take a verified backup, stop gracefully, replace binaries,
+check their source/version, restart against the same genesis/config and verify readiness.
+WAL1/protocol1 are the only supported schemas. There is no older application schema to
+migrate. Unknown formats are rejected; do not edit magic bytes to force an upgrade.
+For an incompatible future version, a reviewed migration/activation plan must precede use.
+Set history_limit_bytes before reaching capacity; replay can require raising it for an
+existing valid ledger. Raising serialized limits also raises memory requirements.
+Run the service as an unprivileged user with an owner-only data directory. Use a service
+manager to supervise blnode --config /absolute/path/node.json and deliver SIGTERM.
+Keep RPC on loopback unless explicitly enabling a secured remote deployment.

@@ -39,8 +39,9 @@ unresolved proposal. Keep independent work progressing without guessing economic
 - Bootstrap can import false finality: specify validation or explicit trust anchors.
 - Product scope can drift into premature layers: implement behavior slices through small interfaces.
 
-The initial request authorizes repository setup and documentation. This plan records
-subsequent development order; no ledger or consensus implementation is claimed complete.
+The implementation request authorizes full product code development. The ledger,
+consensus, network, wallet and operational flows now exist; evidence and outstanding
+external qualification are recorded in the tracker and session handoff.
 
 ## Authorized implementation run
 

@@ -1,22 +1,21 @@
-# Open decisions
+# Decision register
 
-Status: unresolved. Owners below are decision roles, not assigned people.
-Resolve each item with evidence and an ADR or normative contract before its dependency starts.
+The implementation mandate resolved technical choices below. User-specific public
+network identity and external release evidence are not invented by implementation.
 
-| ID | Decision | Blocks | Owner | Required evidence |
-| --- | --- | --- | --- | --- |
-| Q-01 | Independent protocol or Nano-compatible implementation? | Encoding, signatures, addresses, wire protocol | Product/protocol | Compatibility scope and cost; Nano vectors if compatibility is chosen |
-| Q-02 | Voting, weight view, quorum and online-weight rules | Consensus implementation | Protocol | Written assumptions, adversarial traces and executable model |
-| Q-03 | Anti-spam and fair admission for feeless payments | Public P2P and capacity promises | Protocol/runtime | Flood scenarios, resource measurements and fairness policy |
-| Q-04 | Amount width, supply, genesis and distribution | Ledger genesis and public network | Product/protocol | Exact conservation model and reproducible genesis |
-| Q-05 | Database and durability configuration | Durable ledger | Storage | Atomicity, crash tests, migration and backup comparison |
-| Q-06 | Signatures, hashes, key derivation and address format | Codec and wallet | Protocol/security | Reviewed libraries, domains and cross-implementation vectors |
-| Q-07 | Network bootstrap, trust anchors and representative discovery | Shared testnet | Protocol/operations | Recovery and eclipse scenarios; explicit trust model |
-| Q-08 | Supported platforms, node hardware and resource budgets | Release acceptance | Product/operations | Measured workload and deployment matrix |
-| Q-09 | Name, ticker, canonical module path and root license | Public distribution | Maintainer | Naming decision, remote destination and license selection |
-| Q-10 | Upgrades and governance | Long-lived testnet and public release | Product/protocol | Activation, split, rollback and migration procedures |
+| ID | Current decision or remaining work |
+| --- | --- |
+| Q-01 | Independent protocol; accepted ADR-0002. No Nano interoperability claim. |
+| Q-02 | Ordered dynamic-weight, rotating-proposer two-phase confirmation; ADR-0003 and protocol.md. No online-weight quorum reduction. |
+| Q-03 | Per-block configurable PoW plus bounded peers, verification/HTTP admission, queues and payloads. Runtime docs specify limits; stronger economic fairness under sustained adversarial load needs measurement. |
+| Q-04 | uint64 raw fixed supply, checked positive genesis allocations; operator explicitly chooses distribution and network genesis. No public distribution has been selected. |
+| Q-05 | Checksummed fsynced WAL1, exclusive Flock, certified replay, atomic signing envelopes, bounded indexed history and observer-only restore. |
+| Q-06 | Standard Ed25519, SHA-256 domains, checksummed addresses, HMAC wallet derivation and PBKDF2/AES-GCM custody; protocol.md and wallet.md. |
+| Q-07 | Operator-configured peer origins; no untrusted automatic URL discovery. Certified replay from explicit genesis is the bootstrap trust model. |
+| Q-08 | Linux/macOS amd64/arm64. Explicit runtime/history budgets; no measured public throughput or finality guarantee. Long-duration adversarial capacity evidence remains outstanding. |
+| Q-09 | Working name Go Block Lattice, MIT source license. Module path stays example.com/go-block-lattice until a real remote is chosen. No public ticker or remote is invented. |
+| Q-10 | Protocol1/WAL1; compatible binary upgrades preserve data, unsupported versions fail closed. Incompatible governance/activation needs a separately specified network upgrade. |
 
-Working assumptions for documentation only: an independent network, fixed-supply native
-asset, delegated representative voting, local CLI wallet and feeless transfer intent.
-These are not approved numeric parameters or compatibility guarantees.
-The initialized local Go module path is provisional and must change before public imports.
+External independent review, public-network deployment policy and sustained adversarial
+load qualification remain release work. A functioning integrated implementation does
+not manufacture this evidence. See quality.md and the task tracker for current status.

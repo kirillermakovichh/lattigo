@@ -1,45 +1,48 @@
 # Development workflow
 
-Go 1.26 is the initial local baseline. The module path `example.com/go-block-lattice`
-is deliberately provisional; it names no claimed GitHub organization or public repository.
-Choose the canonical path before exposing imports to external consumers.
+Go1.26+ and Python3 are the local development tools. Shipped runtime binaries use only Go.
+The canonical public import path remains pending an actual remote; the local module path
+is example.com/go-block-lattice. No public repository or organization is claimed.
 
 ## Commands
 
-- make check: check formatting, vet, tests, race detection and documentation links.
-- make build: build existing packages.
-- make docs-check: verify relative Markdown links outside .git and generated directories.
+| Command | Purpose |
+| --- | --- |
+| make binaries | Build blnode, blwallet and blctl in bin/ |
+| make check | Local links, Go formatting, vet, focused package tests and race detection |
+| make build | Compile all Go packages |
+| python3 tests/network_smoke.py | One actual multi-process CLI/network/recovery scenario |
+| make release VERSION=local | Deterministic committed host-platform archive |
+| make release-all VERSION=local | Linux/macOS amd64/arm64 archives |
 
-The bootstrap has no Go packages. Go targets report that fact instead of claiming tests ran.
-Build caches are local to .cache/ and excluded from commits.
-CI runs the same baseline; inspect actual CI results after a remote is configured.
+Run compilation and focused checks at coherent implementation/merge boundaries.
+Do not repeat full tests after trivial edits. Run the integrated baseline before declaring
+a merged feature complete. A failing build or violated payment invariant blocks integration.
+Use tests/network_smoke.py --binary-dir bin to exercise already packaged binaries.
+Go caches, binaries, archives and runtime data are excluded from commits.
 
 ## Change workflow
 
-Select one task and inspect its dependencies. Read the relevant authoritative contracts.
-Clarify consensus blockers before implementing dependent code. Implement a coherent behavior
-slice with failure tests and deterministic vectors where appropriate.
-Run applicable checks. Update task status and implementation-progress.md with actual evidence.
-Review the staged diff. Commit with a concise Conventional Commit message.
-Do not combine unrelated features or accumulate a whole product in one commit.
+Select a stable task ID and read its dependencies and authoritative contract.
+Use project-local skills as relevant. Implement one coherent behavior slice.
+Stage explicit paths, review the diff and commit the completed block with a Conventional
+Commit message. Preserve feature commit history when merging branches.
+The user authorized three isolated worktrees for parallel work; shared contract changes
+are coordinated by the integration owner. Do not manufacture commits to increase counts.
+Update the single task tracker and session handoff at meaningful checkpoints.
 
-## Layout
+## Structure
 
-Create cmd/, internal/, tests/ and testdata/ only when they contain real maintained behavior.
-Keep package tests alongside source. Put local runtime data in .local/ and binaries in bin/.
-Do not create src/, pkg/ or a shared utility package without an explicit need.
-Do not commit generated caches, coverage, profiles, keys or production data.
+cmd/ holds thin process entrypoints. internal/ separates protocol, ledger, storage,
+consensus, node, p2p, rpc, wallet, client and operator control responsibilities.
+Package tests live next to implementation. testdata/protocol owns canonical vectors.
+tests/ owns cross-process scenarios. scripts/ owns development/release infrastructure.
+No generic utility layer or empty package scaffolding is required.
 
-## Dependencies and tooling
+## Dependency and compatibility policy
 
-Prefer the standard library where it satisfies the contract. Record the purpose and
-license of new runtime dependencies. Keep go.mod/go.sum tidy when dependencies exist.
-Do not pin a database or cryptographic package before the relevant decision and vectors.
-Add specialized lint, fuzz or benchmark tools when real code requires them.
-The check script is repository infrastructure, not part of the shipped Go runtime.
-
-## Documentation ownership
-
-Update the contract at its authoritative location in docs/README.md.
-Use proposals for unapproved protocol choices. Do not duplicate checklists across docs.
-Keep the handoff concise: current state, verification, blockers and next task.
+The runtime uses the Go standard library. Development skills retain upstream notices.
+Protocol1 and WAL1 are explicit contracts; unsupported versions fail closed.
+Review canonical/signing and persisted formats before changes. Add an ADR for an
+incompatible transition. Update the authoritative docs instead of duplicating definitions.
+Release artifacts include source revision, toolchain, license and checksums.

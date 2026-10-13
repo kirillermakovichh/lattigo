@@ -13,6 +13,10 @@ Every contract has one authoritative home. Link to that home instead of copying 
 | Development and commit workflow | [development](development.md) |
 | Verification and release evidence | [quality](quality.md) |
 | Deployment and recovery requirements | [operations](operations.md) |
+| Runtime configuration, RPC and peer limits | [runtime](runtime.md) |
+| Wallet, CLI and private-network setup | [wallet](wallet.md) |
+| Local release packaging | [release](../release/README.md) |
+| Cross-agent implementation contract | [implementation contract](implementation-contract.md) |
 | External Nano evidence | [research](research/nano.md) |
 | Work order | [plan](../tasks/plan.md) |
 | Task completion | [tasks](../tasks/todo.md) |

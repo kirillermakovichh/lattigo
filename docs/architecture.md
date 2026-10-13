@@ -1,61 +1,65 @@
 # Runtime architecture
 
-Status: design direction; packages and interfaces will be created with actual behavior.
-One Go module and a modular node process avoid premature distributed service boundaries.
-The wallet is a separate local executable so spending keys need not enter the node.
+Status: implemented. A Go module contains a modular full-node process, a separate
+local wallet and operator CLI. Spending keys never need to enter the node.
 
-## Responsibilities and state ownership
+| Package | State and responsibilities |
+| --- | --- |
+| internal/protocol | Exact amounts, genesis, canonical blocks, address/signature/work validation |
+| internal/ledger | Confirmed account frontiers, receivables, weight map and certificate transitions |
+| internal/storage | Exclusive WAL, checksummed frames, durable signing envelopes and atomic files |
+| internal/consensus | Ordered elections, round locks, quorum evidence and signing-before-publication |
+| internal/p2p | Configured peers, bounded gossip, rate limits and verified record catchup |
+| internal/rpc | Versioned HTTP contracts, bearer authorization, readiness, metrics and staged backup |
+| internal/node | Strict config, construction, listener ownership and joined shutdown |
+| internal/wallet | Encrypted custody, deterministic keys, offline/online signing and durable outbox |
+| internal/client | Bounded RPC client, origin/redirect policy and uncertain submission outcomes |
+| internal/control | Genesis/configuration generation, backup, offline verification and restore |
+| cmd/ | blnode, blwallet and blctl entrypoints |
 
-| Planned package | Owns | Allowed effects |
-| --- | --- | --- |
-| internal/protocol | Canonical types, codecs, hashes, deterministic validation | None |
-| internal/ledger | State transition rules, frontiers, receivables and confirmation invariants | Through narrow transactional storage contract |
-| internal/consensus | Elections, vote validation, weight view, quorum and signing discipline | Explicit persistence and transport dependencies |
-| internal/storage | Durable transactions, indexes, schema, migrations and snapshots | Filesystem and selected database |
-| internal/p2p | Peer lifecycle, bounded framing, gossip and dependency retrieval | Network |
-| internal/rpc | Versioned requests, response status, authentication and limits | Local/API transport |
-| internal/wallet | Key lifecycle, local signing, encrypted backup and recovery | Explicit local key storage |
-| internal/node | Configuration, construction, readiness and shutdown | Composition of runtime effects |
-| cmd/ | Thin node, wallet and control entrypoints | Process setup and exit |
+## Ownership and ordering
 
-Names are planned, not a requirement to generate empty folders. Do not introduce an
-interface for each row. Introduce a consumer seam when it hides real variation or I/O.
+Ledger is the sole authority for atomic confirmed transitions. Consensus consumes a
+consistent confirmed view and submits certified records. P2P/RPC never mutate indexes.
+The engine serializes commands and voting state with a mutex. Storage serializes durable
+updates with its own lock. Transport callbacks run after the engine mutex is released.
+Network I/O is outside ledger transitions. The node owns worker and listener lifetimes.
 
-## Dependencies
+At each global confirmation height, weights come from the preceding confirmed state.
+Account balances and pending outgoing funds sum exactly to supply. Protocol.md defines
+the ordered confirmation trade-off and weight transitions.
 
-protocol imports no runtime package. ledger depends on protocol and a storage contract.
-consensus consumes ledger views and submits decisions through ledger operations.
-p2p and rpc submit commands; neither mutates ledger indexes directly.
-node constructs concrete dependencies and owns their lifetimes. Avoid import cycles.
+## Durability
 
-Ledger is the authority for atomic state transitions. A confirmed transition updates
-frontiers, receivables, delegation/weight indexes and confirmation metadata consistently.
-Consensus cannot modify the balance index. Storage does not invent validation rules.
-Weight reads and writes need an explicit consistent view from the protocol specification.
+WAL1 frames include length and its complement, SHA-256 payload checksum and commit marker.
+Records are independently verified on replay and fsynced before publication to readers.
+A genuinely partial final frame may be truncated on reopen. Complete malformed frames,
+unsupported schema, altered genesis and empty/missing established WAL fail closed.
+Representative state has a separate33MiB budget for two quorum proofs, a checksum
+envelope and durable signer marker; disappearance
+or corruption after initialization fails closed. JSON semantics are validated on recovery.
+Directory Flock prevents simultaneous opens. File and directory sync make atomic writes durable.
+This storage implementation supports Linux/macOS, not Windows.
 
-## Concurrency and capacity
+Backups contain consistent confirmed journals, not keys or signing authorization.
+Restore checks the full journal in staging, refuses nonempty targets and writes an
+observer-only marker. It cannot undo external copying of a whole representative identity;
+operators must never clone or roll back a signing directory.
 
-Serialize conflicting account mutations. Choose the concrete transaction and locking
-strategy after the storage decision. Document ordering when multiple accounts are involved.
-Keep remote decoding and expensive signature work outside storage transactions where safe.
-Every worker has an owner, cancellation signal, bounded admission and a joined shutdown path.
-Set limits for bytes, queued items, peers, concurrent verifications, elections and orphan data.
-Critical accepted writes cannot disappear into a dropped channel. Overload returns a defined
-retryable outcome; gossip may be shed only under a documented policy.
+## Capacity and failure
 
-## Lifecycle and failure
+The node indexes confirmed history in memory. A serialized-history ceiling defaults to
+256MiB; admission reserves one maximum frame before voting near capacity. Configured
+ceilings fail closed during replay and new admission. There is no pruning or snapshot
+trust shortcut. Operators must size memory and adjust limits before a long-lived network
+reaches its ceiling; the serialized limit is not an exact RSS bound.
+Protocol representative count, HTTP payloads/parallelism, source rate tables, pending
+blocks, round evidence and outgoing queue bytes/items are bounded. See runtime.md.
+Overload is reported explicitly; dropped best-effort gossip is repaired by re-broadcast
+and certified polling. No accepted critical write is silently dropped.
 
-Startup validates configuration, acquires the data lock, opens the supported schema,
-recovers durable state and signing records, then starts network work. Readiness requires
-storage health and the protocol-defined synchronization condition.
-Partial startup unwinds acquired resources. Liveness alone does not mean ready to vote.
-Shutdown stops admission, stops producers, drains accepted writes, waits for workers,
-flushes durable state and releases the lock. Deadline expiry reports incomplete work.
-Storage corruption or failed critical writes stop signing and confirmation.
-Recovery never resets a database or overwrites a confirmed frontier automatically.
-
-## Interface outcomes
-
-Expose invalid, missing dependency, conflicting, admitted, durable and confirmed outcomes
-without conflating them. Read APIs state which ledger view they use.
-Logs and RPC responses do not contain wallet secrets or private signing material.
+Startup validates config/genesis/key, locks and replays storage, and recovers signing
+state before listening. Partial failure releases acquired resources. Readiness distinguishes
+known catchup, missing voting quorum when work is pending, capacity and internal failures.
+Shutdown stops admission, drains or closes HTTP connections, joins actual handlers and
+workers, and only then releases storage. Expired shutdown deadlines are reported.

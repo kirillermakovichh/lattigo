@@ -1,5 +1,9 @@
 # Implementation contract
 
+Status: historical cross-agent coordination contract. The implemented protocol and
+runtime contracts are maintained in protocol.md, architecture.md and runtime.md;
+actual Go declarations include subsequent capacity and restore-safety extensions.
+
 Accepted implementation choices for this run under the user's implementation mandate:
 independent protocol, Go standard library, uint64 raw amounts encoded as decimal strings,
 SHA-256, standard Ed25519, checksummed public-key addresses, feeless PoW admission,
