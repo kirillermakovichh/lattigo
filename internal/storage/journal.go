@@ -14,6 +14,11 @@ import (
 )
 
 const MaxFrame = 16 << 20
+
+// MaxSigningState accommodates the latest valid quorum plus the prior quorum
+// carried by a durable own proposal, with space for locks, blocks and votes.
+// Ledger records remain bounded independently by MaxFrame.
+const MaxSigningState = 2*MaxFrame + (1 << 20)
 const magic = "BLWAL001"
 
 var marker = []byte("BLCOMMIT")
@@ -212,11 +217,11 @@ func (j *Journal) Signing() ([]byte, error) {
 			f.Close()
 			return nil, statErr
 		}
-		if !info.Mode().IsRegular() || info.Size() > MaxFrame+40 {
+		if !info.Mode().IsRegular() || info.Size() > MaxSigningState+40 {
 			f.Close()
 			return nil, errors.New("invalid signing state file size or type")
 		}
-		b, err = io.ReadAll(io.LimitReader(f, MaxFrame+41))
+		b, err = io.ReadAll(io.LimitReader(f, MaxSigningState+41))
 		err = errors.Join(err, f.Close())
 	}
 	if errors.Is(err, os.ErrNotExist) {
@@ -230,7 +235,7 @@ func (j *Journal) Signing() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(b) < 40 || len(b) > MaxFrame+40 || string(b[:8]) != "BLSIGN01" {
+	if len(b) < 40 || len(b) > MaxSigningState+40 || string(b[:8]) != "BLSIGN01" {
 		return nil, errors.New("invalid signing state envelope")
 	}
 	checksum := sha256.Sum256(b[40:])
@@ -243,7 +248,7 @@ func (j *Journal) SaveSigning(b []byte) error {
 	if j.failed != nil {
 		return j.failed
 	}
-	if len(b) == 0 || len(b) > MaxFrame {
+	if len(b) == 0 || len(b) > MaxSigningState {
 		return errors.New("invalid signing state size")
 	}
 	// A permanent initialization marker makes later disappearance fail closed.
