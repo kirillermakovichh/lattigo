@@ -16,6 +16,9 @@ func (e *Engine) validateRecovered() error {
 	if s.LockedRound < -1 || s.ValidRound < -1 || s.LockedRound > int64(s.Round) || s.ValidRound > int64(s.Round) || len(s.Signed) > 2 {
 		return errors.New("invalid persisted signing round")
 	}
+	if s.LockedRound > s.ValidRound || (s.Locked != nil && s.Valid != nil && s.LockedRound == s.ValidRound && s.Locked.ID() != s.Valid.ID()) {
+		return errors.New("persisted lock contradicts valid certificate")
+	}
 	if (s.Locked == nil) != (s.LockedRound < 0) || (s.Valid == nil) != (s.ValidRound < 0) {
 		return errors.New("inconsistent persisted lock or valid candidate")
 	}

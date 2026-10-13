@@ -120,7 +120,7 @@ func classify(w http.ResponseWriter, err error) {
 	case errors.Is(err, ledger.ErrClosed):
 		writeError(w, 503, "unavailable", "ledger is unavailable")
 	default:
-		writeError(w, 400, "rejected", err.Error())
+		writeError(w, 503, "unavailable", "node cannot safely complete this request; query the block hash before retrying")
 	}
 }
 
