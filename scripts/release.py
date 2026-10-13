@@ -35,7 +35,9 @@ def main():
     out = ROOT / "dist"
     out.mkdir(exist_ok=True)
     sums = []
-    docs = [ROOT / "README.md", ROOT / "LICENSE", *sorted((ROOT / "docs").rglob("*.md"))]
+    docs = [ROOT / "LICENSE", *(ROOT / "docs" / name for name in
+            ("runtime.md", "wallet.md", "protocol.md", "operations.md", "quality.md", "architecture.md")),
+            *sorted((ROOT / "docs" / "adr").glob("*.md"))]
     for goos, goarch in targets:
         if (goos, goarch) not in TARGETS:
             parser.error("only Linux/macOS amd64/arm64 storage platforms are supported")
@@ -48,6 +50,18 @@ def main():
                 subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-ldflags",
                                 f"-s -w -buildid= -X main.version={args.version}+{commit[:12]}",
                                 "-o", str(stage / name), f"./cmd/{name}"], cwd=ROOT, env=env, check=True)
+            (stage / "README.md").write_text(
+                f"# Go Block Lattice {args.version}\n\nSource revision: `{commit}`.\n\n"
+                "This archive contains blnode, blwallet and blctl. Run each with --version.\n"
+                "Generate your own encrypted wallet and explicit network genesis using the\n"
+                "[wallet guide](docs/wallet.md), then start ./blnode --config node.json.\n\n"
+                "- [Node configuration and HTTP interfaces](docs/runtime.md)\n"
+                "- [Protocol and voting assumptions](docs/protocol.md)\n"
+                "- [Backup, recovery and compatible upgrades](docs/operations.md)\n"
+                "- [Verification scope and release qualification](docs/quality.md)\n\n"
+                "The wallet guide's bin/ prefix refers to source builds; these executables\n"
+                "are directly in the extracted directory. No keys, funded public network,\n"
+                "or deployment credentials are included. Verify the sibling SHA256SUMS file.\n")
             manifest = {"version": args.version, "commit": commit, "source_date_epoch": epoch,
                         "go": run("go", "version"), "goos": goos, "goarch": goarch,
                         "cgo": False, "external_runtime_dependencies": [], "protocol_version": 1}
@@ -62,7 +76,7 @@ def main():
                             data = source.read_bytes()
                             info = tarfile.TarInfo(f"{stem}/{name}")
                             info.size = len(data)
-                            info.mode = 0o755 if source.parent == stage and source.name != "manifest.json" else 0o644
+                            info.mode = 0o755 if source.parent == stage and source.name in {"blnode", "blwallet", "blctl"} else 0o644
                             info.mtime = epoch
                             info.uid = info.gid = 0
                             info.uname = info.gname = ""
