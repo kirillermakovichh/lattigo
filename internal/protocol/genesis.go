@@ -93,6 +93,13 @@ func LoadGenesis(path string) (Genesis, error) {
 		return g, e
 	}
 	defer f.Close()
+	info, e := f.Stat()
+	if e != nil {
+		return g, e
+	}
+	if !info.Mode().IsRegular() || info.Size() > 1<<20 {
+		return g, errors.New("genesis must be a regular file of at most 1MiB")
+	}
 	d := json.NewDecoder(io.LimitReader(f, 1<<20))
 	d.DisallowUnknownFields()
 	if e = d.Decode(&g); e != nil {
