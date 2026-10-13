@@ -41,7 +41,7 @@ func open(directory string, header []byte, apply func([]byte) error, repair bool
 	}
 	_, lockStatErr := os.Lstat(filepath.Join(directory, "LOCK"))
 	lockExisted := lockStatErr == nil
-	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR, 0600)
+	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -57,10 +57,10 @@ func open(directory string, header []byte, apply func([]byte) error, repair bool
 		}
 	}()
 	created := true
-	j.file, e = os.OpenFile(filepath.Join(directory, "ledger.wal"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	j.file, e = os.OpenFile(filepath.Join(directory, "ledger.wal"), os.O_CREATE|os.O_EXCL|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if errors.Is(e, os.ErrExist) {
 		created = false
-		j.file, e = os.OpenFile(filepath.Join(directory, "ledger.wal"), os.O_RDWR, 0600)
+		j.file, e = os.OpenFile(filepath.Join(directory, "ledger.wal"), os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	}
 	if e != nil {
 		return nil, e
@@ -204,7 +204,21 @@ func (j *Journal) Backup(w io.Writer) error {
 	return e
 }
 func (j *Journal) Signing() ([]byte, error) {
-	b, err := os.ReadFile(filepath.Join(j.directory, "signing.json"))
+	f, err := os.OpenFile(filepath.Join(j.directory, "signing.json"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	var b []byte
+	if err == nil {
+		info, statErr := f.Stat()
+		if statErr != nil {
+			f.Close()
+			return nil, statErr
+		}
+		if !info.Mode().IsRegular() || info.Size() > MaxFrame+40 {
+			f.Close()
+			return nil, errors.New("invalid signing state file size or type")
+		}
+		b, err = io.ReadAll(io.LimitReader(f, MaxFrame+41))
+		err = errors.Join(err, f.Close())
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		if _, markerErr := os.Stat(filepath.Join(j.directory, "SIGNER")); markerErr == nil {
 			return nil, errors.New("signing state lost after signer initialization; rollback recovery refused")

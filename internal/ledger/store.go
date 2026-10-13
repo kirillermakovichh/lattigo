@@ -336,6 +336,13 @@ func Restore(directory string, src io.Reader, g protocol.Genesis) error {
 
 // RestoreWithOptions permits explicitly provisioned history capacity during import.
 func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, options Options) error {
+	if info, err := os.Lstat(directory); err == nil {
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("restore target must be a real directory")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	if e := g.Validate(); e != nil {
 		return e
 	}
@@ -375,7 +382,7 @@ func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, opt
 	if e = os.Mkdir(directory, 0700); e != nil && !errors.Is(e, os.ErrExist) {
 		return e
 	}
-	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR, 0600)
+	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if e != nil {
 		return e
 	}
