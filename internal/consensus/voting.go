@@ -62,26 +62,42 @@ func (e *Engine) acceptVote(v ledger.Vote) error {
 		return err
 	}
 	if uint64(v.Round) > uint64(e.state.Round)+32 {
-		// Keep only the latest authenticated future vote per representative.
-		if old, ok := e.ahead[v.Representative]; !ok || v.Round >= old.Round {
-			e.ahead[v.Representative] = v
+		// Keep the latest authenticated round and both vote phases per representative.
+		// Forward each new vote once so catch-up evidence can cross relay topologies.
+		entry, ok := e.ahead[v.Representative]
+		if ok && entry.Round > v.Round {
+			return nil
 		}
-		var w protocol.Amount
+		if !ok || entry.Round < v.Round {
+			entry = futureVotes{Round: v.Round, Votes: map[string]ledger.Vote{}}
+		}
+		if old, exists := entry.Votes[v.Phase]; exists {
+			if old.Block != v.Block {
+				return errors.New("representative equivocation")
+			}
+			return nil
+		}
+		entry.Votes[v.Phase] = v
+		e.ahead[v.Representative] = entry
+		e.emit(Message{Type: "vote", Vote: &v})
+		var weight protocol.Amount
 		for rep, other := range e.ahead {
 			if other.Round == v.Round {
-				w += e.weights[rep]
+				weight += e.weights[rep]
 			}
 		}
-		if uint64(w) > uint64(status.Supply)/3 {
+		if uint64(weight) > uint64(status.Supply)/3 {
 			if err := e.advanceRound(v.Round); err != nil {
 				return err
 			}
 			for _, other := range e.ahead {
 				if other.Round == v.Round {
-					e.remember(other)
+					for _, vote := range other.Votes {
+						e.remember(vote)
+					}
 				}
 			}
-			e.ahead = map[protocol.Account]ledger.Vote{}
+			e.ahead = map[protocol.Account]futureVotes{}
 		}
 		return nil
 	}
@@ -348,7 +364,7 @@ func (e *Engine) commit(r ledger.Record, broadcast bool) error {
 	oldRep := e.state.Representative
 	e.state = signingState{Version: 1, Network: status.Network, Representative: oldRep, Height: r.Height + 1, LockedRound: -1, ValidRound: -1, Signed: map[string]ledger.Vote{}}
 	e.weights = e.cfg.Store.Weights()
-	e.ahead = map[protocol.Account]ledger.Vote{}
+	e.ahead = map[protocol.Account]futureVotes{}
 	e.votes = map[uint32]map[string]map[protocol.Account]ledger.Vote{}
 	e.proposals = map[uint32]Proposal{}
 	for id, b := range e.pending {

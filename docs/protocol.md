@@ -96,8 +96,8 @@ Locks persist across rounds. Late retained-round prevote certificates update the
 candidate for later proposals but cannot authorize an old-round local precommit.
 Timeouts advance voting phases and then rounds. Timeouts grow with round up to15 times
 the configured base. More than one third authenticated weight observed in a future
-round permits catchup while preserving locks. Very-future evidence retains only one
-latest vote per representative; ordinary retained round state is bounded.
+round permits catchup while preserving locks. Very-future evidence retains both phases from only the latest
+round per representative and relays each accepted vote once; ordinary retained round state is bounded.
 Dropped gossip is repaired by re-broadcast and verified record polling.
 
 Safety assumes less than one third Byzantine weight at each confirmed height and

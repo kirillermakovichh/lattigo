@@ -40,10 +40,15 @@ type signingState struct {
 	Proposal       *Proposal              `json:"proposal,omitempty"`
 }
 
+type futureVotes struct {
+	Round uint32
+	Votes map[string]ledger.Vote
+}
+
 type Engine struct {
 	lastBroadcast   time.Time
 	broadcastCursor int
-	ahead           map[protocol.Account]ledger.Vote
+	ahead           map[protocol.Account]futureVotes
 	mu              sync.Mutex
 	cfg             Config
 	state           signingState
@@ -111,7 +116,7 @@ func New(cfg Config) (*Engine, error) {
 		e.state.Signed = map[string]ledger.Vote{}
 	}
 	e.weights = cfg.Store.Weights()
-	e.ahead = map[protocol.Account]ledger.Vote{}
+	e.ahead = map[protocol.Account]futureVotes{}
 	if err = e.validateRecovered(); err != nil {
 		return nil, err
 	}

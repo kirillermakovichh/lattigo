@@ -254,3 +254,34 @@ func TestLatePrevoteCertificateSurvivesRoundChange(t *testing.T) {
 		t.Fatal("late previous-round certificate created an old-round lock")
 	}
 }
+
+func TestFutureRoundVotesPropagateAcrossRelay(t *testing.T) {
+	f := makeFixture(4)
+	relay, store := openEngine(t, f, 3)
+	var outgoing []Message
+	relay.Subscribe(func(m Message) { outgoing = append(outgoing, m) })
+	for i := 0; i < 2; i++ {
+		vote := ledger.Vote{Network: f.genesis.ID(), Height: 1, Round: 1000, Phase: "prevote", Parent: store.Status().Tip, Representative: f.accounts[i]}
+		if err := vote.Sign(f.keys[i]); err != nil {
+			t.Fatal(err)
+		}
+		if err := relay.Handle(Message{Type: "vote", Vote: &vote}); err != nil {
+			t.Fatal(err)
+		}
+		// A repeating packet must not amplify traffic in a cyclic peer topology.
+		if err := relay.Handle(Message{Type: "vote", Vote: &vote}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	forwarded := map[protocol.Account]int{}
+	for _, message := range outgoing {
+		if message.Vote != nil && message.Vote.Round == 1000 && message.Vote.Phase == "prevote" {
+			forwarded[message.Vote.Representative]++
+		}
+	}
+	for _, rep := range f.accounts[:2] {
+		if forwarded[rep] != 1 {
+			t.Errorf("relayed future vote %s %d times, want1", rep, forwarded[rep])
+		}
+	}
+}
