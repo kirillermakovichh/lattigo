@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"example.com/go-block-lattice/internal/ledger"
 	"example.com/go-block-lattice/internal/protocol"
 )
 
@@ -57,5 +58,67 @@ func TestExplicitGenesisAndPrivateConfiguration(t *testing.T) {
 	}
 	if e = RunControl(context.Background(), []string{"config", "--out", config}, &out, &errout); e == nil {
 		t.Fatal("configuration overwritten")
+	}
+}
+
+func TestVerifyDoesNotCreateMissingLedger(t *testing.T) {
+	dir := t.TempDir()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	manifest := filepath.Join(dir, "genesis.json")
+	var out, errout bytes.Buffer
+	if err := RunControl(context.Background(), []string{"genesis", "--name", "verify-test", "--account", string(account), "--balance", "100", "--work-bits", "0", "--out", manifest}, &out, &errout); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"inspect", "verify"} {
+		data := filepath.Join(dir, command)
+		if err := RunControl(context.Background(), []string{command, "--genesis", manifest, "--data-dir", data}, &out, &errout); err == nil {
+			t.Errorf("%s reported a missing ledger as valid", command)
+		}
+		if _, err := os.Stat(data); !os.IsNotExist(err) {
+			t.Errorf("%s created a data directory", command)
+		}
+	}
+}
+
+func TestVerifyPreservesIncompleteJournal(t *testing.T) {
+	dir := t.TempDir()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	manifest := filepath.Join(dir, "genesis.json")
+	var out, errout bytes.Buffer
+	if err := RunControl(context.Background(), []string{"genesis", "--name", "verify-tail", "--account", string(account), "--balance", "100", "--out", manifest}, &out, &errout); err != nil {
+		t.Fatal(err)
+	}
+	g, err := protocol.LoadGenesis(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := filepath.Join(dir, "data")
+	st, err := ledger.Open(data, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	wal := filepath.Join(data, "ledger.wal")
+	original, err := os.ReadFile(wal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	damaged := append(original, 1, 2, 3)
+	if err = os.WriteFile(wal, damaged, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = RunControl(context.Background(), []string{"verify", "--genesis", manifest, "--data-dir", data}, &out, &errout); err == nil {
+		t.Error("verify accepted incomplete journal")
+	}
+	after, err := os.ReadFile(wal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(damaged, after) {
+		t.Fatal("verify changed the journal")
 	}
 }

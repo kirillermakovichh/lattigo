@@ -33,6 +33,27 @@ type Store struct {
 func Open(directory string, g protocol.Genesis) (*Store, error) {
 	return OpenWithOptions(directory, g, Options{})
 }
+
+// OpenExisting verifies an existing journal without creating a ledger or
+// repairing an incomplete tail. The exclusive data lock is still acquired.
+func OpenExisting(directory string, g protocol.Genesis, options Options) (*Store, error) {
+	info, err := os.Lstat(directory)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("inspection requires a real data directory")
+	}
+	info, err = os.Lstat(filepath.Join(directory, "ledger.wal"))
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("inspection requires an existing regular journal")
+	}
+	return open(directory, g, true, options)
+}
+
 func OpenWithOptions(directory string, g protocol.Genesis, options Options) (*Store, error) {
 	return open(directory, g, false, options)
 }

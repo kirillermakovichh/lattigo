@@ -138,7 +138,8 @@ bin/blctl verify --genesis .local/genesis.json --data-dir .local/restored-data
 
 Live backup is authenticated and streamed into an exclusive durable file.
 Its default byte limit is 1 GiB; `--max-bytes` changes that bound.
-Offline inspect/verify acquire the data lock and replay the ledger. Stop the node first.
+Offline inspect/verify require an existing journal, acquire the data lock and replay it
+without repairing incomplete records. They do not create a missing ledger. Stop the node first.
 Restore refuses a nonempty target and verifies the backup against the supplied genesis.
 Restored data is **observer-only**: a ledger backup is not authorization to roll back or
 reactivate an old representative signing identity. Do not clone active signing keys.

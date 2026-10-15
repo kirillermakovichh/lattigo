@@ -228,7 +228,7 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			}
 			return controlOutput(out, map[string]any{"data_dir": dataDir, "status": "restored_observer_only"})
 		}
-		st, e := ledger.Open(dataDir, g)
+		st, e := ledger.OpenExisting(dataDir, g, ledger.Options{})
 		if e != nil {
 			return e
 		}
