@@ -122,6 +122,7 @@ For a send, link is the destination; for a receive it is the source hash; for a 
 it is empty. Offline signing cannot validate a frontier or receivable against live state.
 It deliberately requires explicit state; it must not be used to sign competing candidates.
 Submit the exact saved file from a connected machine using `submit --file`.
+Signed block input files are limited to64KiB in their entirety, including whitespace.
 
 ## Query and operator recovery
 

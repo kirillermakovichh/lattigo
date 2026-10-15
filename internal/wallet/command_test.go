@@ -3,7 +3,9 @@ package wallet
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -37,5 +39,27 @@ func TestOfflineSigningWorkflow(t *testing.T) {
 	}
 	if err := b.Verify(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSignedBlockFileRejectsBytesBeyondLimit(t *testing.T) {
+	key := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{3}, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Block{Version: 1, Network: protocol.Digest([]byte("bounded file")), Kind: "change", Account: account, Representative: account, Balance: 1}
+	if err := b.Sign(key); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, bytes.Repeat([]byte{' '}, (64<<10)-len(data))...)
+	data = append(data, []byte("{}")...)
+	path := filepath.Join(t.TempDir(), "block.json")
+	if err = os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = loadBlock(path); err == nil {
+		t.Fatal("signed-block loader accepted hidden trailing data beyond64KiB")
 	}
 }

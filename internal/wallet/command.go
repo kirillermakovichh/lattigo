@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
@@ -496,7 +497,14 @@ func loadBlock(path string) (protocol.Block, error) {
 		return b, e
 	}
 	defer f.Close()
-	d := json.NewDecoder(io.LimitReader(f, 64<<10))
+	data, e := io.ReadAll(io.LimitReader(f, (64<<10)+1))
+	if e != nil {
+		return b, e
+	}
+	if len(data) > 64<<10 {
+		return b, errors.New("signed block file exceeds64KiB")
+	}
+	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	if e = d.Decode(&b); e != nil {
 		return b, e
