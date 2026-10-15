@@ -155,7 +155,10 @@ func readFrame(r io.Reader) ([]byte, error) {
 		return nil, io.EOF
 	}
 	if e != nil {
-		return nil, io.ErrUnexpectedEOF
+		if errors.Is(e, io.EOF) || errors.Is(e, io.ErrUnexpectedEOF) {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return nil, e
 	}
 	size := binary.BigEndian.Uint32(header)
 	if binary.BigEndian.Uint32(header[4:]) != ^size || size == 0 || size > MaxFrame {
@@ -163,7 +166,10 @@ func readFrame(r io.Reader) ([]byte, error) {
 	}
 	body := make([]byte, int(size)+len(marker))
 	if _, e = io.ReadFull(r, body); e != nil {
-		return nil, io.ErrUnexpectedEOF
+		if errors.Is(e, io.EOF) || errors.Is(e, io.ErrUnexpectedEOF) {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return nil, e
 	}
 	if !bytes.Equal(body[size:], marker) {
 		return nil, errors.New("invalid journal commit marker")
