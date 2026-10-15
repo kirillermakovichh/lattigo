@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -87,5 +89,43 @@ func TestCertifiedCatchupOverHTTP(t *testing.T) {
 	received := observerStore.Receivables(destination, 0, 10)
 	if len(received) != 1 || received[0].Amount != 10 {
 		t.Fatalf("catchup lost payment: %+v", received)
+	}
+}
+
+func TestDisconnectedPeerDoesNotRetainSyncReadiness(t *testing.T) {
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	genesis := protocol.Genesis{Version: 1, Name: "readiness-test", Supply: 100, Allocations: []protocol.Allocation{{Account: account, Balance: 100, Representative: account}}}
+	store, err := ledger.Open(t.TempDir(), genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	engine, err := consensus.New(consensus.Config{Store: store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-BL-Version", "1")
+		w.Header().Set("X-BL-Network", string(genesis.ID()))
+		if r.URL.Path == "/p2p/status" {
+			_ = json.NewEncoder(w).Encode(peerStatus{Version: 1, Network: genesis.ID(), Height: 10, Tip: genesis.ID()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]ledger.Record{})
+	}))
+	defer server.Close()
+	network, err := New(Config{Store: store, Engine: engine, Peers: []string{server.URL}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	network.syncPeer(context.Background(), network.peers[0])
+	server.Close()
+	network.syncPeer(context.Background(), network.peers[0])
+	if network.peers[0].connected.Load() {
+		t.Fatal("closed peer remains connected")
+	}
+	if network.Syncing() {
+		t.Fatal("unreachable peer's stale height blocks readiness")
 	}
 }

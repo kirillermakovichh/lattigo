@@ -261,7 +261,7 @@ func (n *Network) syncPeer(ctx context.Context, p *peer) {
 				return
 			}
 		}
-		if len(records) > 16 {
+		if len(records) == 0 || len(records) > 16 {
 			p.connected.Store(false)
 			return
 		}
@@ -303,7 +303,7 @@ func (n *Network) syncPeer(ctx context.Context, p *peer) {
 func (n *Network) Syncing() bool {
 	height := n.cfg.Store.Status().Height
 	for _, p := range n.peers {
-		if p.height.Load() > height {
+		if p.connected.Load() && p.height.Load() > height {
 			return true
 		}
 	}

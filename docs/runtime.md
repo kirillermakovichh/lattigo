@@ -105,6 +105,8 @@ Readiness is separate from liveness and includes consensus and observed catchup 
 When pending work lacks observed voting quorum, readiness returns HTTP 503. An idle
 node can serve confirmed reads without promising that a voting quorum is currently online.
 An isolated node cannot infer unseen network progress from its own ledger height.
+Disconnected peers do not keep readiness blocked with old advertised heights. A peer
+claiming to be ahead must return a nonempty certified page to remain connected.
 SIGINT or SIGTERM stops admission, drains HTTP handlers for up to ten seconds,
 cancels owned background workers, joins them, and closes durable state.
 An expired drain deadline is an error; open connections are closed before storage release.
