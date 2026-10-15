@@ -11,6 +11,9 @@ and reproducible binary packaging are implemented.
 
 The user authorized three isolated worktrees and regular meaningful feature commits.
 Branches feat/core, feat/runtime and feat/wallet were merged with feature history preserved.
+After verification, their clean worktrees and merged branch refs were removed.
+Generated bin/, dist/, local build caches and task-specific temporary files were removed
+at the user’s request. Rebuild binaries with make binaries and archives with make release-all.
 The integration owner implemented consensus, coordinated contracts and integrated packages.
 All work is local; no remote, push, public genesis distribution or deployment occurred.
 
