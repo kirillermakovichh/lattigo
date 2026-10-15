@@ -2,6 +2,7 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -117,7 +118,14 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 				return e
 			}
 			defer f.Close()
-			d := json.NewDecoder(io.LimitReader(f, 1<<20))
+			raw, e := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+			if e != nil {
+				return e
+			}
+			if len(raw) > 1<<20 {
+				return errors.New("allocations file exceeds1MiB")
+			}
+			d := json.NewDecoder(bytes.NewReader(raw))
 			d.DisallowUnknownFields()
 			if e = d.Decode(&g.Allocations); e != nil {
 				return e

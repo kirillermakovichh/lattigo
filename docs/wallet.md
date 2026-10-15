@@ -63,7 +63,8 @@ bin/blnode --config .local/node.json
 
 `ACCOUNT` must contain the actual checksummed account address from your wallet.
 The genesis command defaults its single allocation's representative to that account.
-Multiple initial allocations use `--allocations allocations.json`, an array of objects:
+Multiple initial allocations use `--allocations allocations.json`, a complete file
+limited to1MiB containing an array of objects:
 `account`, `balance` (decimal string) and `representative`. Supply is checked and summed.
 Network identity includes genesis parameters. Different manifests create different networks.
 No embedded secret key or pre-funded external network is shipped.

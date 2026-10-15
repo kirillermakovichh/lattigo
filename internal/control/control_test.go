@@ -122,3 +122,24 @@ func TestVerifyPreservesIncompleteJournal(t *testing.T) {
 		t.Fatal("verify changed the journal")
 	}
 }
+
+func TestGenesisAllocationInputRejectsBytesBeyondLimit(t *testing.T) {
+	dir := t.TempDir()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	rows := []protocol.Allocation{{Account: account, Balance: 100, Representative: account}}
+	data, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, bytes.Repeat([]byte{' '}, (1<<20)-len(data))...)
+	data = append(data, []byte("{}")...)
+	source := filepath.Join(dir, "allocations.json")
+	if err = os.WriteFile(source, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errout bytes.Buffer
+	if err = RunControl(context.Background(), []string{"genesis", "--name", "bounded-input", "--allocations", source, "--out", filepath.Join(dir, "genesis.json")}, &out, &errout); err == nil {
+		t.Fatal("genesis accepted hidden JSON beyond allocation size limit")
+	}
+}
