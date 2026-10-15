@@ -334,6 +334,16 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	if e != nil {
 		return e
 	}
+	// Resolve aliases so commands for the same wallet share one outbox and lock.
+	f.path, e = filepath.EvalSymlinks(f.path)
+	if e != nil {
+		return e
+	}
+	accountLock, e := lockAccount(f.path, f.index)
+	if e != nil {
+		return e
+	}
+	defer accountLock.Close() // Closing the descriptor releases Flock, including on process exit.
 	// A durable outbox prevents an uncertain prior submission from being silently replaced.
 	pending := fmt.Sprintf("%s.pending-%d.json", f.path, f.index)
 	if existing, e := loadBlock(pending); e == nil {
