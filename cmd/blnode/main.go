@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -26,6 +27,9 @@ func run(args []string) error {
 	config := flags.String("config", "", "path to node JSON configuration")
 	showVersion := flags.Bool("version", false, "print binary version")
 	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 	if flags.NArg() != 0 {
