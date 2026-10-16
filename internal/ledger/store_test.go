@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"example.com/go-block-lattice/internal/protocol"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -207,5 +208,32 @@ func TestHistoryAndBootstrapPagesBoundCopiedBytes(t *testing.T) {
 	}
 	if got := len(store.History(a, 2, 1000)); got != 1 {
 		t.Fatal("history offset lost")
+	}
+}
+
+type countedBackup struct{ remaining, read int64 }
+
+func (r *countedBackup) Read(p []byte) (int, error) {
+	if r.remaining == 0 {
+		return 0, io.EOF
+	}
+	n := len(p)
+	if int64(n) > r.remaining {
+		n = int(r.remaining)
+	}
+	clear(p[:n])
+	r.read += int64(n)
+	r.remaining -= int64(n)
+	return n, nil
+}
+func TestRestoreBoundsUntrustedInputBeforeStaging(t *testing.T) {
+	state, _, _ := fixture(t)
+	limit := int64(32 << 20)
+	source := &countedBackup{remaining: limit*2 + (2 << 20)}
+	if err := RestoreWithOptions(filepath.Join(t.TempDir(), "restored"), source, state.genesis, Options{MaxHistoryBytes: uint64(limit)}); err == nil {
+		t.Fatal("invalid oversized backup accepted")
+	}
+	if source.read > limit*2+(1<<20)+1 {
+		t.Fatalf("restore read%d bytes past its configured budget", source.read)
 	}
 }

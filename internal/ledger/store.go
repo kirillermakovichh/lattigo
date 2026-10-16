@@ -19,6 +19,16 @@ const DefaultMaxHistoryBytes uint64 = 256 << 20
 
 type Options struct{ MaxHistoryBytes uint64 }
 
+func normalizeOptions(options Options) (Options, error) {
+	if options.MaxHistoryBytes == 0 {
+		options.MaxHistoryBytes = DefaultMaxHistoryBytes
+	}
+	if options.MaxHistoryBytes < 32<<20 || options.MaxHistoryBytes > 1<<40 {
+		return options, errors.New("history limit must be32MiB..1TiB")
+	}
+	return options, nil
+}
+
 type Store struct {
 	historyBytes uint64
 	historyLimit uint64
@@ -58,11 +68,9 @@ func OpenWithOptions(directory string, g protocol.Genesis, options Options) (*St
 	return open(directory, g, false, options)
 }
 func open(directory string, g protocol.Genesis, strict bool, options Options) (*Store, error) {
-	if options.MaxHistoryBytes == 0 {
-		options.MaxHistoryBytes = DefaultMaxHistoryBytes
-	}
-	if options.MaxHistoryBytes < 32<<20 || options.MaxHistoryBytes > 1<<40 {
-		return nil, errors.New("history limit must be 32MiB..1TiB")
+	options, e := normalizeOptions(options)
+	if e != nil {
+		return nil, e
 	}
 	if e := g.Validate(); e != nil {
 		return nil, e
@@ -357,6 +365,10 @@ func Restore(directory string, src io.Reader, g protocol.Genesis) error {
 
 // RestoreWithOptions permits explicitly provisioned history capacity during import.
 func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, options Options) error {
+	options, e := normalizeOptions(options)
+	if e != nil {
+		return e
+	}
 	if info, err := os.Lstat(directory); err == nil {
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return errors.New("restore target must be a real directory")
@@ -384,7 +396,14 @@ func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, opt
 	if e != nil {
 		return e
 	}
-	_, e = io.Copy(f, src)
+	// Valid records contain signatures larger than their48-byte frame overhead.
+	// Twice the history budget plus1MiB for genesis bounds every valid archive.
+	backupLimit := int64(options.MaxHistoryBytes)*2 + (1 << 20)
+	var copied int64
+	copied, e = io.Copy(f, io.LimitReader(src, backupLimit+1))
+	if e == nil && copied > backupLimit {
+		e = errors.New("backup exceeds configured history and framing budget")
+	}
 	if e == nil {
 		e = f.Sync()
 	}

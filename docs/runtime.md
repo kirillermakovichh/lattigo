@@ -65,6 +65,8 @@ Pagination defaults to 100; limits are 1..1000 and offsets 0..10000000.
 Request bodies are at most 1 MiB. RPC admits at most 32 simultaneous handlers.
 Overload returns HTTP 503. Invalid JSON and unknown fields are rejected.
 The backup is a ledger backup, not a wallet or representative-signing-state backup.
+Offline restore limits total input to twice the configured serialized history budget
+plus1MiB of genesis overhead, so oversized streams cannot grow staging without bound.
 Only one backup is staged at a time. It is completed in a private temporary file before
 HTTP success headers are sent; the temporary file is deleted after transfer.
 
