@@ -39,6 +39,7 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 	var genesis, dataDir, output, backup, allocations, name, account, balance, representative, rpc, p2p, repKey, tokenFile string
 	var workBits uint
 	var maxBytes int64
+	var historyLimit uint64
 	var timeout time.Duration
 	var peers peerFlags
 	var remote bool
@@ -72,6 +73,7 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			fs.Int64Var(&maxBytes, "max-bytes", 1<<30, "maximum backup bytes")
 		}
 	case "restore", "inspect", "verify":
+		fs.Uint64Var(&historyLimit, "history-limit-bytes", ledger.DefaultMaxHistoryBytes, "configured ledger history byte capacity (32MiB..1TiB)")
 		fs.StringVar(&genesis, "genesis", "genesis.json", "network manifest")
 		fs.StringVar(&dataDir, "data-dir", "data", "node data directory")
 		if cmd == "restore" {
@@ -231,12 +233,12 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 				return e
 			}
 			defer f.Close()
-			if e = ledger.Restore(dataDir, f, g); e != nil {
+			if e = ledger.RestoreWithOptions(dataDir, f, g, ledger.Options{MaxHistoryBytes: historyLimit}); e != nil {
 				return e
 			}
 			return controlOutput(out, map[string]any{"data_dir": dataDir, "status": "restored_observer_only"})
 		}
-		st, e := ledger.OpenExisting(dataDir, g, ledger.Options{})
+		st, e := ledger.OpenExisting(dataDir, g, ledger.Options{MaxHistoryBytes: historyLimit})
 		if e != nil {
 			return e
 		}

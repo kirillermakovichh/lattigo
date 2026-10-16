@@ -143,3 +143,52 @@ func TestGenesisAllocationInputRejectsBytesBeyondLimit(t *testing.T) {
 		t.Fatal("genesis accepted hidden JSON beyond allocation size limit")
 	}
 }
+
+func TestOfflineCommandsHonorConfiguredHistoryCapacity(t *testing.T) {
+	dir := t.TempDir()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	account := protocol.Address(key.Public().(ed25519.PublicKey))
+	g := protocol.Genesis{Version: 1, Name: "offline-capacity", Supply: 100, Allocations: []protocol.Allocation{{Account: account, Balance: 100, Representative: account}}}
+	manifest := filepath.Join(dir, "genesis.json")
+	data, err := json.Marshal(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(manifest, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	original := filepath.Join(dir, "data")
+	store, err := ledger.Open(original, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var backup bytes.Buffer
+	if err = store.Backup(&backup); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	backupPath := filepath.Join(dir, "backup")
+	if err = os.WriteFile(backupPath, backup.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errout bytes.Buffer
+	restored := filepath.Join(dir, "restored")
+	if err = RunControl(context.Background(), []string{"restore", "--genesis", manifest, "--backup", backupPath, "--data-dir", restored, "--history-limit-bytes", "33554432"}, &out, &errout); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"inspect", "verify"} {
+		out.Reset()
+		if err = RunControl(context.Background(), []string{command, "--genesis", manifest, "--data-dir", restored, "--history-limit-bytes", "33554432"}, &out, &errout); err != nil {
+			t.Fatal(err)
+		}
+		var status ledger.Status
+		if err = json.Unmarshal(out.Bytes(), &status); err != nil {
+			t.Fatal(err)
+		}
+		if status.HistoryLimitBytes != 32<<20 {
+			t.Fatal("offline command ignored provisioned capacity")
+		}
+	}
+}
