@@ -19,6 +19,7 @@ import (
 
 	"example.com/go-block-lattice/internal/client"
 	"example.com/go-block-lattice/internal/ledger"
+	"example.com/go-block-lattice/internal/node"
 	"example.com/go-block-lattice/internal/protocol"
 )
 
@@ -178,7 +179,10 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			token = hex.EncodeToString(b)
 			clear(b)
 		}
-		v := map[string]any{"data_dir": dataDir, "genesis": genesis, "rpc_listen": rpc, "p2p_listen": p2p, "peers": []string(peers), "rpc_token": token, "representative_key": repKey, "round_timeout_ms": 2000, "max_pending": 4096, "max_peers": 32, "allow_remote_rpc": remote}
+		v := node.Config{DataDir: dataDir, Genesis: genesis, RPCListen: rpc, P2PListen: p2p, Peers: []string(peers), RPCToken: token, RepresentativeKey: repKey, RoundTimeoutMS: 2000, MaxPending: 4096, MaxPeers: 32, AllowRemoteRPC: remote, HistoryLimitBytes: ledger.DefaultMaxHistoryBytes}
+		if e := v.Validate(); e != nil {
+			return fmt.Errorf("node configuration: %w", e)
+		}
 		if e := writeJSONNew(output, v); e != nil {
 			return e
 		}

@@ -192,3 +192,17 @@ func TestOfflineCommandsHonorConfiguredHistoryCapacity(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigurationGenerationRejectsInvalidRuntimeValues(t *testing.T) {
+	for _, flags := range [][]string{{"--rpc-listen", "127.0.0.1:-1"}, {"--peer", "file:///tmp/not-a-peer"}, {"--rpc-listen", "0.0.0.0:7070"}} {
+		path := filepath.Join(t.TempDir(), "node.json")
+		var out, errout bytes.Buffer
+		args := append([]string{"config", "--out", path}, flags...)
+		if err := RunControl(context.Background(), args, &out, &errout); err == nil {
+			t.Errorf("created invalid configuration for%v", flags)
+		}
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Error("invalid configuration was published")
+		}
+	}
+}
