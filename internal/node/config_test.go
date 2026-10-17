@@ -32,3 +32,13 @@ func TestConfigurationRejectsUnsafeExposure(t *testing.T) {
 		t.Fatal("unsafe default")
 	}
 }
+
+func TestListenerPortsAreValidatedBeforeStartup(t *testing.T) {
+	for _, listen := range []string{"127.0.0.1:-1", "127.0.0.1:65536", "127.0.0.1:unknown-service", "127.0.0.1:+7070"} {
+		cfg := Config{Genesis: "genesis.json", RPCListen: listen, P2PListen: "127.0.0.1:7071"}
+		cfg.defaults()
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("invalid listener accepted:%s", listen)
+		}
+	}
+}

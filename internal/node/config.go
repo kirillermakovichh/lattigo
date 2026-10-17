@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,6 +124,15 @@ func (c Config) Validate() error {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil || port == "" {
 			return fmt.Errorf("invalid listener %q", address)
+		}
+		_, portErr := strconv.ParseUint(port, 10, 16) // Zero explicitly requests an ephemeral listener.
+		if portErr != nil {
+			return fmt.Errorf("listener port must be an unsigned decimal in0..65535: %q", address)
+		}
+		for _, digit := range port {
+			if digit < '0' || digit > '9' {
+				return fmt.Errorf("listener port must contain decimal digits: %q", address)
+			}
 		}
 		if host != "" && net.ParseIP(host) == nil && host != "localhost" {
 			return errors.New("listeners require an IP literal or localhost")
