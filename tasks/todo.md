@@ -308,3 +308,22 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 **Verification:** Clean install, checksums, upgrade/restore and full workflow evidence; public deployment remains a separate action.
 
 **Implementation evidence:** Implemented baseline: reproducible archives, checksums, manifests, version output and license. External independent review, public distribution and public governance/launch decisions remain outstanding.
+
+
+## BL-022: Test all packages and executable workflows
+
+- [x] Complete
+
+**Dependencies:** BL-019.
+
+**Scope:** cmd/, internal/, tests/network_smoke.py and release/verification.md.
+
+**Acceptance:** Reproduce observed behavioral failures, commit each change independently,
+and run the full package, concurrency, RPC, wallet, network and packaging checks.
+
+**Verification:** All13 packages pass vet and race tests. Final instrumented and packaged
+network scenarios pass. Five fuzz targets pass1350245 inputs. Four platform archives
+reproduce byte-for-byte. Combined measured statement coverage is75.7%.
+
+**Implementation evidence:** Twelve dedicated behavioral commits plus separate test
+coverage commits. Exact findings, commands, coverage and limits live in release/verification.md.

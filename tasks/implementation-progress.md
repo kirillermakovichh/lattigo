@@ -53,3 +53,15 @@ Local implementation and integration are complete. Subsequent work should target
 explicitly outstanding release qualification instead of rebuilding completed payment,
 consensus, networking or wallet features. Preserve regular coherent commits.
 Do not launch or publish a public network without an explicit deployment instruction.
+
+## Whole-project testing follow-up
+
+Sourcec8bcacc was checked across all13 packages and three executables.
+Twelve separately reproduced behavioral changes were committed individually; subjects
+name code behavior without a bug-fix prefix. See release/verification.md for their IDs.
+Final vet/race/format/link checks passed. Combined unit plus process coverage is75.7%.
+Five fuzz targets completed1350245 executions. Four final release targets rebuilt
+byte-for-byte; both instrumented and ordinary final-source network scenarios passed.
+No tracked data or temporary worktrees were created for testing. Generated artifacts
+were removed after recording the evidence. Public deployment and external review remain
+outside this local testing pass; BL-020/BL-021 are still open.

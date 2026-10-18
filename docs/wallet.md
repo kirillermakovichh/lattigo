@@ -108,8 +108,10 @@ The CLI refuses to create another online block for that account until the previo
 outbox block is confirmed. It never invents an automatic conflicting replacement.
 If a signed candidate is permanently rejected, inspect its error and account frontier
 before explicitly removing the outbox. The CLI cannot infer that a timeout means rejection.
-Concurrent online commands for one wallet account are rejected while another holds
-the account lock. Wallet path aliases share that lock and outbox. Keep lock files in
+Concurrent online commands for an account within one wallet file are rejected while
+another holds its account lock. Symbolic-link aliases share that lock and outbox.
+Restored/imported copies at different paths or hosts have independent locks and must
+not create concurrent payments for the same account. Keep lock files in
 place; removing one while a command runs would break mutual exclusion.
 Keep pending files with an incident backup; encrypted wallet backup alone contains keys,
 not pending transaction intent. Online creation combines an account lock with exclusive outbox publication.
