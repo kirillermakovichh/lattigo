@@ -217,6 +217,9 @@ func (c *Client) Wait(ctx context.Context, id protocol.Hash) error {
 
 // Backup streams an authenticated consistent backup, refusing oversized downloads.
 func (c *Client) Backup(ctx context.Context, dst io.Writer, maxBytes int64) error {
+	if maxBytes <= 0 || maxBytes == int64(^uint64(0)>>1) {
+		return errors.New("backup byte limit must be positive and below int64 maximum")
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", c.base+"/v1/admin/backup", nil)
 	if err != nil {
 		return err
@@ -229,9 +232,6 @@ func (c *Client) Backup(ctx context.Context, dst io.Writer, maxBytes int64) erro
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("backup HTTP status %d", resp.StatusCode)
-	}
-	if maxBytes <= 0 || maxBytes == int64(^uint64(0)>>1) {
-		return errors.New("backup byte limit must be positive and below int64 maximum")
 	}
 	n, err := io.Copy(dst, io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
