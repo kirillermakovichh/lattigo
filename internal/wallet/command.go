@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"example.com/go-block-lattice/internal/client"
@@ -492,11 +493,18 @@ func writeBlock(out io.Writer, path string, b protocol.Block) error {
 }
 func loadBlock(path string) (protocol.Block, error) {
 	var b protocol.Block
-	f, e := os.Open(filepath.Clean(path))
+	f, e := os.OpenFile(filepath.Clean(path), os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return b, e
 	}
 	defer f.Close()
+	info, e := f.Stat()
+	if e != nil {
+		return b, e
+	}
+	if !info.Mode().IsRegular() {
+		return b, errors.New("signed block input must be a regular file")
+	}
 	data, e := io.ReadAll(io.LimitReader(f, (64<<10)+1))
 	if e != nil {
 		return b, e

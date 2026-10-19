@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -222,7 +223,7 @@ func decrypt(data, password []byte) ([]byte, error) {
 }
 
 func readPrivate(path string) ([]byte, error) {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open private file: %w", err)
 	}
