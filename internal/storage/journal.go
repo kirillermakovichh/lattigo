@@ -215,6 +215,9 @@ func (j *Journal) Backup(w io.Writer) error {
 	return e
 }
 func (j *Journal) Signing() ([]byte, error) {
+	if j.file == nil {
+		return nil, errors.New("journal closed")
+	}
 	f, err := os.OpenFile(filepath.Join(j.directory, "signing.json"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	var b []byte
 	if err == nil {
@@ -251,6 +254,9 @@ func (j *Journal) Signing() ([]byte, error) {
 	return b[40:], nil
 }
 func (j *Journal) SaveSigning(b []byte) error {
+	if j.file == nil {
+		return errors.New("journal closed")
+	}
 	if j.failed != nil {
 		return j.failed
 	}
