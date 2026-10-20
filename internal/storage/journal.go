@@ -218,7 +218,7 @@ func (j *Journal) Signing() ([]byte, error) {
 	if j.file == nil {
 		return nil, errors.New("journal closed")
 	}
-	f, err := os.OpenFile(filepath.Join(j.directory, "signing.json"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	f, err := os.OpenFile(filepath.Join(j.directory, "signing.json"), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	var b []byte
 	if err == nil {
 		info, statErr := f.Stat()
