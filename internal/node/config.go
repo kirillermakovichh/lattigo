@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"example.com/go-block-lattice/internal/ledger"
@@ -64,11 +65,18 @@ func (c *Config) defaults() {
 
 func LoadConfig(path string) (Config, error) {
 	var cfg Config
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return cfg, err
 	}
 	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return cfg, err
+	}
+	if !info.Mode().IsRegular() {
+		return cfg, errors.New("configuration must be a regular file")
+	}
 	raw, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
 	if err != nil {
 		return cfg, err

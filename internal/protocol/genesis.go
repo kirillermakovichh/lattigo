@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"syscall"
 )
 
 type Allocation struct {
@@ -88,7 +89,7 @@ func (g Genesis) ID() Hash {
 }
 func LoadGenesis(path string) (Genesis, error) {
 	var g Genesis
-	f, e := os.Open(path)
+	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return g, e
 	}

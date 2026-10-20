@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"example.com/go-block-lattice/internal/client"
@@ -116,11 +117,18 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			if account != "" || balance != "" || representative != "" {
 				return errors.New("--allocations cannot be combined with single-allocation flags")
 			}
-			f, e := os.Open(allocations)
+			f, e := os.OpenFile(allocations, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 			if e != nil {
 				return e
 			}
 			defer f.Close()
+			info, e := f.Stat()
+			if e != nil {
+				return e
+			}
+			if !info.Mode().IsRegular() {
+				return errors.New("allocations must be a regular file")
+			}
 			raw, e := io.ReadAll(io.LimitReader(f, (1<<20)+1))
 			if e != nil {
 				return e
@@ -297,7 +305,7 @@ func writeNew(path string, write func(io.Writer) error) error {
 	return d.Sync()
 }
 func controlSecret(path string) ([]byte, error) {
-	f, e := os.Open(path)
+	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
