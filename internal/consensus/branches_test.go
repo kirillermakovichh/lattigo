@@ -328,3 +328,88 @@ func TestRecoveredLocksProofsVotesAndProposals(t *testing.T) {
 		})
 	}
 }
+
+func TestPendingRebroadcastAndObservedQuorumBranches(t *testing.T) {
+	f := makeFixture(4)
+	e, s := openEngine(t, f, 3)
+	for value := protocol.Amount(1); value <= 40; value++ {
+		b := sendBlock(t, f)
+		b.Balance = value
+		if err := b.Sign(f.keys[0]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.submit(b, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(e.Pending()) != 40 {
+		t.Fatal("pending snapshot incomplete")
+	}
+	e.outgoing = nil
+	e.rebroadcast()
+	if len(e.outgoing) != 32 {
+		t.Fatal("retransmit batch not bounded")
+	}
+	for _, phase := range []string{"prevote", "precommit"} {
+		v := ledger.Vote{Network: f.genesis.ID(), Height: 1, Parent: s.Status().Tip, Phase: phase, Representative: f.accounts[0]}
+		if err := v.Sign(f.keys[0]); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.acceptVote(v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if e.Health()["observed_voting_weight"] != protocol.Amount(100) {
+		t.Fatal("same representative counted twice")
+	}
+	if err := e.advanceRound(5); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.votes) != 0 {
+		t.Fatal("old rounds retained")
+	}
+	e.weights["zero"] = 0
+	if len(sortedRepresentatives(e.weights)) != 4 {
+		t.Fatal("zero weight proposer included")
+	}
+	if proposer(1, 0, nil) != "" {
+		t.Fatal("empty committee has proposer")
+	}
+	if (&Proposal{Representative: f.accounts[0]}).Sign(nil) == nil {
+		t.Fatal("invalid proposal signer accepted")
+	}
+	if (Proposal{Representative: "bad"}).Verify() == nil {
+		t.Fatal("invalid proposal identity accepted")
+	}
+}
+func TestFutureVoteDeduplicationAndInvalidCommitBranches(t *testing.T) {
+	f := makeFixture(4)
+	e, s := openEngine(t, f, 3)
+	makeVote := func(round uint32, hash protocol.Hash) ledger.Vote {
+		v := ledger.Vote{Network: f.genesis.ID(), Height: 1, Round: round, Phase: "prevote", Parent: s.Status().Tip, Block: hash, Representative: f.accounts[0]}
+		if err := v.Sign(f.keys[0]); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	v := makeVote(1001, "")
+	if err := e.acceptVote(v); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.acceptVote(makeVote(1000, "")); err != nil {
+		t.Fatal("older future evidence should be ignored")
+	}
+	if e.acceptVote(makeVote(1001, protocol.Digest([]byte("different")))) == nil {
+		t.Fatal("future equivocation accepted")
+	}
+	r := ledger.Record{Height: 1, Previous: s.Status().Tip, Block: sendBlock(t, f)}
+	if !errors.Is(e.commit(r, false), ledger.ErrInvalid) {
+		t.Fatal("invalid certificate accepted")
+	}
+	if e.failure != nil {
+		t.Fatal("invalid remote certificate stopped engine")
+	}
+	if !errors.Is(e.commit(ledger.Record{}, false), ledger.ErrConflict) {
+		t.Fatal("invalid historical record accepted")
+	}
+}
