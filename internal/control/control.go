@@ -240,11 +240,18 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			if backup == "" {
 				return errors.New("--backup is required")
 			}
-			f, e := os.Open(backup)
+			f, e := os.OpenFile(backup, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 			if e != nil {
 				return e
 			}
 			defer f.Close()
+			info, e := f.Stat()
+			if e != nil {
+				return e
+			}
+			if !info.Mode().IsRegular() {
+				return errors.New("backup input must be a regular file")
+			}
 			if e = ledger.RestoreWithOptions(dataDir, f, g, ledger.Options{MaxHistoryBytes: historyLimit}); e != nil {
 				return e
 			}
