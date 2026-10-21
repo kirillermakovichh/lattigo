@@ -204,3 +204,59 @@ func TestStoreClosedAndRestoreTargetBranches(t *testing.T) {
 		t.Fatal("inspect through symlink accepted")
 	}
 }
+
+func TestLedgerFailedPersistenceAndPaginationBranches(t *testing.T) {
+	state, key, other := fixture(t)
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Address(other.Public().(ed25519.PublicKey))
+	dir := t.TempDir()
+	store, err := Open(dir, state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	r := nextRecord(t, state, protocol.Block{Version: 1, Network: state.genesis.ID(), Kind: "send", Account: a, Representative: a, Balance: 90, Link: string(b)}, key)
+	if len(store.Receivables(a, -1, 0)) != 0 || len(store.Records(0, 0)) != 0 {
+		t.Fatal("empty pages invalid")
+	}
+	if err = store.Commit(r); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.Receivables(a, 0, 1)) != 0 || len(store.Receivables(b, -1, 0)) != 1 || len(store.Receivables(b, 0, 1)) != 1 || len(store.History(b, 0, 2000)) != 0 || len(store.Records(0, 0)) != 1 {
+		t.Fatal("pagination filtering or limits failed")
+	}
+	if err = os.Mkdir(filepath.Join(dir, "signing.json"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	failed := store.SaveSigningState([]byte("signing intent"))
+	if failed == nil {
+		t.Fatal("signing write failure ignored")
+	}
+	for _, err := range []error{store.Validate(r.Block), store.Commit(r), store.SaveSigningState([]byte("again")), store.Backup(io.Discard)} {
+		if err == nil {
+			t.Fatal("failed store resumed critical work")
+		}
+	}
+	limited, err := Open(t.TempDir(), state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer limited.Close()
+	limited.historyBytes = limited.historyLimit
+	if !errors.Is(limited.Commit(r), ErrCapacity) {
+		t.Fatal("exact commit byte limit ignored")
+	}
+	if _, err = Open(t.TempDir(), protocol.Genesis{}); err == nil {
+		t.Fatal("invalid genesis opened")
+	}
+	empty := t.TempDir()
+	if _, err = OpenExisting(empty, state.genesis, Options{}); err == nil {
+		t.Fatal("missing WAL inspected")
+	}
+	if err = os.Mkdir(filepath.Join(empty, "ledger.wal"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = OpenExisting(empty, state.genesis, Options{}); err == nil {
+		t.Fatal("directory WAL inspected")
+	}
+}
