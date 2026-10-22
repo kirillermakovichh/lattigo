@@ -71,6 +71,12 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 		{"send confirmed", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, true},
 		{"receive acknowledged", "receive", nil, true},
 		{"opening representative", "receive", []string{"--representative", string(sender)}, true},
+		{"status query", "status", nil, true},
+		{"status unavailable", "status", nil, false},
+		{"block query", "block", nil, true},
+		{"block unavailable", "block", nil, false},
+		{"default opening representative", "receive", nil, true},
+		{"derived account query", "account", nil, true},
 		{"history query", "history", []string{"--address", string(a)}, true},
 		{"account query", "account", []string{"--address", string(a)}, true},
 		{"receivables query", "receivables", []string{"--address", string(a)}, true},
@@ -115,13 +121,17 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 				case "/v1/genesis":
 					response = g
 				case "/v1/status":
+					if item.name == "status unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					status := client.Status{Network: g.ID(), Supply: g.Supply}
 					if item.name == "status network" {
 						status.Network = "other"
 					}
 					response = status
 				case "/v1/account":
-					if item.name == "opening representative" {
+					if item.name == "opening representative" || item.name == "default opening representative" {
 						out.WriteHeader(404)
 						response = map[string]any{"error": map[string]string{"code": "not_found"}}
 						break
@@ -135,6 +145,10 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					}
 					response = state
 				case "/v1/block":
+					if item.name == "block unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					if item.name == "pending unresolved" || item.name == "wait unavailable" {
 						if item.name == "wait unavailable" {
 							out.WriteHeader(503)
@@ -183,6 +197,9 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 			defer server.Close()
 			args := []string{item.command, "--wallet", path, "--rpc", server.URL, "--timeout", "10s"}
 			args = append(args, item.args...)
+			if item.command == "block" {
+				args = append(args, "--hash", string(source.ID()))
+			}
 			if item.command == "receive" && item.name != "missing source" {
 				args = append(args, "--source", string(source.ID()))
 			}

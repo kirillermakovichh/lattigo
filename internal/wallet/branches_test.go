@@ -151,3 +151,17 @@ func TestWalletCommandArgumentAndOutputBranches(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenFileClientOutcomes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	flags := commandFlags{rpc: "http://local.invalid", tokenFile: path}
+	if _, err := flags.client(); err == nil {
+		t.Fatal("missing token accepted")
+	}
+	if err := os.WriteFile(path, []byte("private-test-token\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := flags.client(); err != nil {
+		t.Fatal(err)
+	}
+}
