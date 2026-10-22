@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -186,4 +187,102 @@ func TestPeerTransportAndQueueBranches(t *testing.T) {
 	if n.Run(ctx) != nil {
 		t.Fatal("cancellation failed")
 	}
+}
+
+func TestPeerCatchupRejectionAndFallbackOutcomes(t *testing.T) {
+	for _, scenario := range []string{"version", "network", "fallback-fails", "fallback-empty", "fallback-stale", "gap", "certificate"} {
+		t.Run(scenario, func(t *testing.T) {
+			n := branchNetwork(t)
+			p := &peer{url: "http://local.invalid"}
+			n.peers = []*peer{p}
+			state := n.cfg.Store.Status()
+			status := peerStatus{Version: 1, Network: state.Network, Height: state.Height + 1}
+			if scenario == "version" {
+				status.Version = 2
+			}
+			if scenario == "network" {
+				status.Network = "wrong"
+			}
+			pages := 0
+			n.client.Transport = peerTransport(func(r *http.Request) (*http.Response, error) {
+				header := make(http.Header)
+				header.Set("X-BL-Network", string(state.Network))
+				header.Set("X-BL-Version", "1")
+				var value any = status
+				if r.URL.Path == "/p2p/records" {
+					pages++
+					if strings.HasPrefix(scenario, "fallback-") && (pages == 1 || scenario == "fallback-fails") {
+						return nil, io.ErrClosedPipe
+					}
+					switch scenario {
+					case "fallback-empty":
+						value = []ledger.Record{}
+					case "fallback-stale":
+						value = []ledger.Record{{Height: state.Height}}
+					case "gap":
+						value = []ledger.Record{{Height: state.Height + 2}}
+					default:
+						value = []ledger.Record{{Height: state.Height + 1}}
+					}
+				}
+				raw, err := json.Marshal(value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return &http.Response{StatusCode: 200, Header: header, Body: io.NopCloser(strings.NewReader(string(raw)))}, nil
+			})
+			n.syncPeer(context.Background(), p)
+			wantConnected := scenario == "fallback-stale"
+			if p.connected.Load() != wantConnected {
+				t.Fatalf("connected=%v", p.connected.Load())
+			}
+			if strings.HasPrefix(scenario, "fallback-") && pages != 2 {
+				t.Fatalf("fallback pages=%d", pages)
+			}
+			if n.cfg.Store.Status().Height != state.Height {
+				t.Fatal("unverified history applied")
+			}
+			if n.Syncing() != wantConnected {
+				t.Fatal("sync observation disagrees with peer state")
+			}
+			stats := n.Stats().(map[string]any)
+			wantCount := 0
+			if wantConnected {
+				wantCount = 1
+			}
+			if stats["connected"] != wantCount || stats["peers"] != 1 {
+				t.Fatal(stats)
+			}
+		})
+	}
+}
+
+func TestPeerRequestSizeAndConstructionOutcomes(t *testing.T) {
+	n := branchNetwork(t)
+	if err := n.request(context.Background(), &peer{url: "%"}, "GET", "", nil, nil); err == nil {
+		t.Fatal("invalid request accepted")
+	}
+	network := string(n.cfg.Store.Status().Network)
+	n.client.Transport = peerTransport(func(*http.Request) (*http.Response, error) {
+		header := make(http.Header)
+		header.Set("X-BL-Network", network)
+		header.Set("X-BL-Version", "1")
+		return &http.Response{StatusCode: 200, Header: header, Body: io.NopCloser(io.LimitReader(repeatedSpace{}, maxResponse+1))}, nil
+	})
+	var result peerStatus
+	if err := n.request(context.Background(), &peer{url: "http://local.invalid"}, "GET", "", nil, &result); err == nil || !strings.Contains(err.Error(), "exceeds limit") {
+		t.Fatalf("size rejection: %v", err)
+	}
+	if !n.allow("host-without-port") {
+		t.Fatal("host-only rate key rejected")
+	}
+}
+
+type repeatedSpace struct{}
+
+func (repeatedSpace) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = ' '
+	}
+	return len(p), nil
 }
