@@ -172,3 +172,26 @@ func TestBackupAndConfirmationFailureBranches(t *testing.T) {
 		t.Fatal("confirmation wait ignored cancellation")
 	}
 }
+
+func TestRequestConstructionAndDiscardedResponseOutcomes(t *testing.T) {
+	ctx := context.Background()
+	c := branchClient(t, 200, "not-required-json")
+	if err := c.request(ctx, "GET", "/", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.request(ctx, "POST", "/", make(chan int), nil); err == nil {
+		t.Fatal("unsupported body accepted")
+	}
+	c.base = "%"
+	if err := c.request(ctx, "GET", "/", nil, nil); err == nil {
+		t.Fatal("malformed request accepted")
+	}
+	if err := c.Backup(ctx, io.Discard, 10); err == nil {
+		t.Fatal("malformed backup request accepted")
+	}
+	c.base = "http://local.invalid"
+	c.http.Transport = transportFunc(func(*http.Request) (*http.Response, error) { return nil, io.ErrClosedPipe })
+	if err := c.Backup(ctx, io.Discard, 10); !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatalf("backup transport error: %v", err)
+	}
+}
