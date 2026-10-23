@@ -17,5 +17,3 @@ The manifest's exact Go toolchain string makes differing toolchains visible.
 Verify checksums before extraction. `blnode --version`, `blwallet --version` and
 `blctl --version` report the packaged version and source revision.
 A reproducible archive is not evidence that all release gates in docs/quality.md pass.
-
-See [integrated verification](verification.md) for actual build and execution evidence.

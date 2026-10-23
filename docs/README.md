@@ -16,7 +16,6 @@ Every contract has one authoritative home. Link to that home instead of copying 
 | Runtime configuration, RPC and peer limits | [runtime](runtime.md) |
 | Wallet, CLI and private-network setup | [wallet](wallet.md) |
 | Local release packaging | [release](../release/README.md) |
-| Observed integration evidence | [verification](../release/verification.md) |
 | Cross-agent implementation contract | [implementation contract](implementation-contract.md) |
 | External Nano evidence | [research](research/nano.md) |
 | Work order | [plan](../tasks/plan.md) |

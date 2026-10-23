@@ -316,7 +316,7 @@ Every task also meets the [Definition of Done](../.agents/references/definition-
 
 **Dependencies:** BL-019.
 
-**Scope:** cmd/, internal/, tests/network_smoke.py and release/verification.md.
+**Scope:** cmd/, internal/, tests/network_smoke.py.
 
 **Acceptance:** Reproduce observed behavioral failures, commit each change independently,
 and run the full package, concurrency, RPC, wallet, network and packaging checks.
@@ -326,7 +326,7 @@ network scenarios pass. Five fuzz targets pass1350245 inputs. Four platform arch
 reproduce byte-for-byte. Combined measured statement coverage is75.7%.
 
 **Implementation evidence:** Twelve dedicated behavioral commits plus separate test
-coverage commits. Exact findings, commands, coverage and limits live in release/verification.md.
+coverage commits.
 
 
 ## BL-023: Audit decision outcomes across the implementation
@@ -335,15 +335,13 @@ coverage commits. Exact findings, commands, coverage and limits live in release/
 
 **Dependencies:** BL-022.
 
-**Scope:** cmd/, internal/, scripts/branch_coverage.py, release/decision-coverage.md.
+**Scope:** cmd/, internal/, scripts/branch_coverage.py.
 
-**Acceptance:** Inventory decision outcomes, exercise reachable residuals, and document
-per-outcome evidence for invariant-excluded or fault-injection-dependent paths.
+**Acceptance:** Inventory decision outcomes, exercise reachable residuals, and verify
+invariant-excluded and fault-injection-dependent paths without coverage reports in docs.
 
 **Verification:** Isolated decision measurement plus ordinary-source make check and
 real-process network workflow. Each observed behavioral correction has a separate commit.
 
-**Implementation evidence:** 896 sites inventoried;1609/1837 outcomes observed (87.6%).
-Six separately reproduced behavioral corrections committed. Full unobserved inventory
-is in release/decision-coverage.md. Per-outcome classification and reachable residuals
-remain outstanding; this task is intentionally not marked complete.
+**Implementation evidence:** In progress. Tests and executable checks are the evidence;
+coverage output stays in ignored temporary artifacts.
