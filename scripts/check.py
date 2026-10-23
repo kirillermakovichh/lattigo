@@ -17,6 +17,7 @@ if not sources:
 if sys.argv[1:] == ["--build"]:
     subprocess.run(["go", "build", "./..."], check=True)
 else:
+    subprocess.run(["python3", "tests/branch_coverage_tool_test.py"], check=True)
     formatted = subprocess.run(["gofmt", "-l", *map(str, sources)],
                                check=True, capture_output=True, text=True)
     if formatted.stdout:
