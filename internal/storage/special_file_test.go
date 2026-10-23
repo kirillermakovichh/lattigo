@@ -36,3 +36,18 @@ func TestSigningRecoveryRejectsFIFOWithoutWriter(t *testing.T) {
 		t.Fatal("signing recovery waited for a FIFO writer")
 	}
 }
+
+func TestJournalRejectsSpecialLockBeforeCreatingWAL(t *testing.T) {
+	dir := t.TempDir()
+	if err := syscall.Mkfifo(filepath.Join(dir, "LOCK"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	journal, err := Open(dir, []byte("genesis"), func([]byte) error { return nil })
+	if err == nil {
+		journal.Close()
+		t.Fatal("FIFO accepted as directory lock")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ledger.wal")); !os.IsNotExist(err) {
+		t.Fatal("invalid lock created WAL")
+	}
+}
