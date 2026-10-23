@@ -327,3 +327,23 @@ reproduce byte-for-byte. Combined measured statement coverage is75.7%.
 
 **Implementation evidence:** Twelve dedicated behavioral commits plus separate test
 coverage commits. Exact findings, commands, coverage and limits live in release/verification.md.
+
+
+## BL-023: Audit decision outcomes across the implementation
+
+- [ ] Complete
+
+**Dependencies:** BL-022.
+
+**Scope:** cmd/, internal/, scripts/branch_coverage.py, release/decision-coverage.md.
+
+**Acceptance:** Inventory decision outcomes, exercise reachable residuals, and document
+per-outcome evidence for invariant-excluded or fault-injection-dependent paths.
+
+**Verification:** Isolated decision measurement plus ordinary-source make check and
+real-process network workflow. Each observed behavioral correction has a separate commit.
+
+**Implementation evidence:** 896 sites inventoried;1609/1837 outcomes observed (87.6%).
+Six separately reproduced behavioral corrections committed. Full unobserved inventory
+is in release/decision-coverage.md. Per-outcome classification and reachable residuals
+remain outstanding; this task is intentionally not marked complete.

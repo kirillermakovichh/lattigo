@@ -118,3 +118,28 @@ Previously recorded BL-020/BL-021 release gates remain open.
 
 Generated archives, instrumented binaries, profiles, fuzz/build caches and raw coverage
 files were removed after this report. Rebuild them using the documented source commands.
+
+
+## Decision outcome audit (2026-11-15)
+
+The subsequent branch audit added rejection, lifecycle and recovery matrices across
+all internal packages. Six behavioral corrections were reproduced before changing the code:
+backup budgets are validated before remote requests; closed journals revoke signing
+access; special wallet inputs, configuration/admin/genesis inputs, signing-state files
+and restore backup inputs are rejected without waiting for FIFO writers. The special
+file corrections are isolated in separate commits by input ownership.
+
+Behavioral commits: f41d202, d5f1144, 119e0cd, 032518a, 73a8e5f, 6f2039d.
+Each subject describes changed behavior rather than labeling a bug fix.
+
+The isolated decision audit observed 1609/1837 outcomes (87.6%) at896 sites.
+All instrumented packages and the four-representative/restored-observer scenario passed.
+The [full outcome inventory](decision-coverage.md) lists every remaining outcome and
+measurement limits. Statement coverage from the prior pass is a separate metric.
+Reachable residuals still exist; this does not complete exhaustive branch qualification.
+BL-020/BL-021 remain open.
+
+Ordinary-source make check passed after the added matrices: formatting,50 relative
+documentation links, vet, package tests and race detector. Both instrumentation
+self-tests passed and are now part of make check. Focused P2P/client/wallet/storage
+race checks also passed. Generated audit/build caches were removed afterward.

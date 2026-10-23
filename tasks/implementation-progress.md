@@ -65,3 +65,24 @@ byte-for-byte; both instrumented and ordinary final-source network scenarios pas
 No tracked data or temporary worktrees were created for testing. Generated artifacts
 were removed after recording the evidence. Public deployment and external review remain
 outside this local testing pass; BL-020/BL-021 are still open.
+
+
+## Decision audit handoff
+
+The branch audit added matrices in every internal package and six independently
+reproduced behavioral commits (see release/verification.md). Only main exists;
+there are no extra worktrees. No delegation was used in this audit.
+
+The isolated instrumenter inventories896 sites and1837 outcomes. Package and real
+network runs observed1609 outcomes (87.6%). release/decision-coverage.md retains every
+unobserved site. BL-023 remains open: classify residuals individually, cover reachable
+wallet/control error flows, consensus persistence and runtime failure schedules.
+Do not mistake statement coverage for decision coverage or mark remaining outcomes
+unreachable without evidence. The public-release gates BL-020/BL-021 are unchanged.
+
+Final ordinary-source make check passed (50 relative documentation links, formatting,
+vet, all package tests and race detection), as did both instrumentation self-tests.
+Additional focused wallet/client/P2P/storage race checks passed. No new fuzz, hardware
+or external review result is claimed in this pass. Temporary instrumentation copies
+were removed automatically; generated audit/build caches were removed after recording
+the report. Local commits only; no remote action.
