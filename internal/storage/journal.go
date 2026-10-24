@@ -45,6 +45,9 @@ func open(directory string, header []byte, apply func([]byte) error, repair bool
 		return nil, errors.New("storage directory must be a real directory")
 	}
 	_, lockStatErr := os.Lstat(filepath.Join(directory, "LOCK"))
+	if lockStatErr != nil && !errors.Is(lockStatErr, os.ErrNotExist) {
+		return nil, lockStatErr
+	}
 	lockExisted := lockStatErr == nil
 	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
 	if e != nil {
