@@ -286,3 +286,119 @@ func (repeatedSpace) Read(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+func TestPeerFanoutShedsFullItemAndByteQueues(t *testing.T) {
+	n := branchNetwork(t)
+	bytesFull := &peer{url: "http://bytes.invalid", queue: make(chan []byte, 1)}
+	bytesFull.queued.Store(24 << 20)
+	itemsFull := &peer{url: "http://items.invalid", queue: make(chan []byte, 1)}
+	n.peers = []*peer{bytesFull, itemsFull}
+	started := make(chan struct{}, 2)
+	n.client.Transport = peerTransport(func(r *http.Request) (*http.Response, error) {
+		started <- struct{}{}
+		<-r.Context().Done()
+		return nil, r.Context().Err()
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- n.Run(ctx) }()
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("peer worker did not start")
+		}
+	}
+	for i := 0; i < 3; i++ {
+		n.Publish(consensus.Message{Type: "unknown"})
+	}
+	deadline := time.After(time.Second)
+	for n.dropped.Load() < 5 {
+		select {
+		case <-deadline:
+			t.Fatal("fanout capacity did not shed excess work")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	if len(itemsFull.queue) != 1 || itemsFull.queued.Load() == 0 {
+		t.Fatal("accepted queued bytes were not retained")
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPendingRepairCursorAndSubmissionFailure(t *testing.T) {
+	n := branchNetwork(t)
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	block := protocol.Block{Version: 1, Network: n.cfg.Store.Genesis().ID(), Kind: "send", Account: a, Representative: a, Balance: 99, Link: string(a)}
+	if err := block.Sign(key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := n.cfg.Engine.Submit(block); err != nil {
+		t.Fatal(err)
+	}
+	p := &peer{url: "http://local.invalid", pendingCursor: 99}
+	posts := 0
+	n.client.Transport = peerTransport(func(r *http.Request) (*http.Response, error) {
+		header := make(http.Header)
+		header.Set("X-BL-Network", string(block.Network))
+		header.Set("X-BL-Version", "1")
+		body := ""
+		if r.Method == "POST" {
+			posts++
+			return nil, io.ErrClosedPipe
+		}
+		raw, err := json.Marshal(peerStatus{Version: 1, Network: block.Network})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body = string(raw)
+		return &http.Response{StatusCode: 200, Header: header, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})
+	n.syncPeer(context.Background(), p)
+	if posts != 1 || p.pendingCursor != 1 || p.connected.Load() {
+		t.Fatal("pending repair failed to wrap cursor and disconnect rejected peer")
+	}
+	before := n.dropped.Load()
+	n.Publish(consensus.Message{Type: strings.Repeat("x", maxMessage+1)})
+	if n.dropped.Load() != before+1 {
+		t.Fatal("oversized publication retained")
+	}
+}
+
+func TestCertifiedPeerPagesEncodeMultipleRecords(t *testing.T) {
+	n := branchNetwork(t)
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	for i := 0; i < 2; i++ {
+		state, err := n.cfg.Store.Account(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		block := protocol.Block{Version: 1, Network: n.cfg.Store.Genesis().ID(), Kind: "send", Account: a, Previous: state.Frontier, Representative: a, Balance: state.Balance - 1, Link: string(a)}
+		if err := block.Sign(key); err != nil {
+			t.Fatal(err)
+		}
+		status := n.cfg.Store.Status()
+		vote := ledger.Vote{Network: block.Network, Height: status.Height + 1, Parent: status.Tip, Block: block.ID(), Phase: "precommit", Representative: a}
+		if err := vote.Sign(key); err != nil {
+			t.Fatal(err)
+		}
+		if err := n.cfg.Store.Commit(ledger.Record{Height: status.Height + 1, Previous: status.Tip, Block: block, Votes: []ledger.Vote{vote}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := httptest.NewRecorder()
+	n.records(out, httptest.NewRequest("GET", "/p2p/records?after=0&limit=16", nil))
+	var records []ledger.Record
+	if err := json.Unmarshal(out.Body.Bytes(), &records); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 || records[0].Height != 1 || records[1].Height != 2 || out.Body.Len() > maxResponse {
+		t.Fatal("certified page ordering or size invalid")
+	}
+}
