@@ -66,6 +66,48 @@ class BranchInstrumentation(unittest.TestCase):
                     self.assertGreater(observed.get(site["id"], {}).get(outcome, 0), 0,
                                        (site["expression"], outcome))
 
+    def test_fault_injection_is_isolated_and_selective(self):
+        with tempfile.TemporaryDirectory(prefix="bl-fault-tool-test-") as temporary:
+            copy = Path(temporary) / "copy"
+            sample = copy / "internal/sample"
+            sample.mkdir(parents=True)
+            (copy / "go.mod").write_text("module example.com/go-block-lattice\n\ngo 1.26.0\n")
+            (sample / "sample.go").write_text('''package sample
+import "os"
+func Write(path string)error{
+ f,err:=os.OpenFile(path,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600);if err!=nil{return err}
+ defer f.Close()
+ if _,err=f.Write([]byte("payload"));err!=nil{return err}
+ return f.Sync()
+}
+''')
+            (sample / "sample_test.go").write_text('''package sample
+import("errors";"os";"path/filepath";"testing")
+func TestInjection(t *testing.T){
+ dir:=t.TempDir()
+ normal:=filepath.Join(dir,"normal")
+ if err:=Write(normal);err!=nil{t.Fatal(err)}
+ raw,err:=os.ReadFile(normal);if err!=nil||string(raw)!="payload"{t.Fatal("normal semantics changed")}
+ for _,point:=range _auditPoints{
+  _auditArm(point.ID,1)
+  err:=Write(filepath.Join(t.TempDir(),"output"))
+  if !errors.Is(err,_auditInjected)||!_auditReached(){t.Fatalf("fault not propagated: %s %v",point.ID,err)}
+  _auditArm("",0)
+ }
+}
+''')
+            env = dict(os.environ, GOCACHE=str(ROOT / ".cache/go-build"))
+            subprocess.run(["go", "run", str(ROOT / "scripts/fault_injection/instrument.go"), str(copy)],
+                           cwd=ROOT, env=env, check=True, capture_output=True, text=True)
+            subprocess.run(["go", "test", "./..."], cwd=copy, env=env, check=True,
+                           capture_output=True, text=True)
+            (copy / ".git").mkdir()
+            before = (sample / "sample.go").read_bytes()
+            result = subprocess.run(["go", "run", str(ROOT / "scripts/fault_injection/instrument.go"), str(copy)],
+                                    cwd=ROOT, env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual((sample / "sample.go").read_bytes(), before)
+
     def test_existing_unowned_output_is_preserved(self):
         with tempfile.TemporaryDirectory(prefix="bl-audit-output-test-") as temporary:
             out = Path(temporary)

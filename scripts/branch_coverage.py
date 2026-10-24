@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".cache/branches")
+    parser.add_argument("--faults", action="store_true", help="inject I/O failures in the isolated source copy")
     parser.add_argument("--network", action="store_true", help="include actual CLI/network processes")
     args = parser.parse_args()
     out = args.output.resolve()
@@ -35,7 +36,12 @@ def main():
         inventory = out / "inventory.json"
         subprocess.run(["go", "run", str(ROOT / "scripts/branch_coverage/instrument.go"), str(copy), str(inventory)],
                        cwd=ROOT, env=env, check=True)
-        subprocess.run(["go", "test", "-count=1", "./..."], cwd=copy, env=env, check=True)
+        test_command=["go", "test", "-count=1"]
+        if args.faults:
+            subprocess.run(["go", "run", str(ROOT / "scripts/fault_injection/instrument.go"), str(copy)],
+                           cwd=ROOT, env=env, check=True)
+            test_command += ["-tags", "faultaudit"]
+        subprocess.run([*test_command, "./..."], cwd=copy, env=env, check=True)
         if args.network:
             binaries = copy / "bin"
             binaries.mkdir()
