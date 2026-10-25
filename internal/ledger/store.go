@@ -440,6 +440,17 @@ func RestoreWithOptions(directory string, src io.Reader, g protocol.Genesis, opt
 			return errors.New("restore target became nonempty")
 		}
 	}
+	lockInfo, e := lock.Stat()
+	if e != nil {
+		return e
+	}
+	currentLock, e := os.Lstat(filepath.Join(directory, "LOCK"))
+	if e != nil {
+		return e
+	}
+	if !currentLock.Mode().IsRegular() || !os.SameFile(lockInfo, currentLock) {
+		return errors.New("restore directory lock changed before publication")
+	}
 	if e = storage.AtomicWrite(directory, "RESTORED", []byte("observer-only backup restore\n")); e != nil {
 		return e
 	}
