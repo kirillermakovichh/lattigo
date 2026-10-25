@@ -29,6 +29,42 @@ func resultType(call *ast.CallExpr) string {
 	format.Node(&receiver, token.NewFileSet(), selector.X)
 	name := selector.Sel.Name
 	switch receiver.String() {
+	case "json":
+		if name == "Marshal" || name == "MarshalIndent" {
+			return "[]byte"
+		}
+	case "rand":
+		if name == "Read" {
+			return "int"
+		}
+	case "pbkdf2":
+		if name == "Key" {
+			return "[]byte"
+		}
+	case "aes":
+		if name == "NewCipher" {
+			return "cipher.Block"
+		}
+	case "cipher":
+		if name == "NewGCM" {
+			return "cipher.AEAD"
+		}
+	case "p2p":
+		if name == "New" {
+			return "*p2p.Network"
+		}
+	case "rpc":
+		if name == "New" {
+			return "*rpc.Server"
+		}
+	case "w":
+		if name == "PrivateKey" {
+			return "ed25519.PrivateKey"
+		}
+	case "v", "p":
+		if name == "Sign" {
+			return "error"
+		}
 	case "os":
 		switch name {
 		case "Open", "OpenFile", "CreateTemp":
@@ -41,7 +77,15 @@ func resultType(call *ast.CallExpr) string {
 			return "[]os.DirEntry"
 		case "MkdirTemp":
 			return "string"
-		case "MkdirAll", "Mkdir", "Rename", "Link":
+		case "MkdirAll", "Mkdir", "Rename", "Link", "Remove":
+			return "error"
+		}
+	case "filepath":
+		if name == "EvalSymlinks" || name == "Abs" {
+			return "string"
+		}
+	case "b":
+		if name == "GenerateWork" {
 			return "error"
 		}
 	case "io":
@@ -53,6 +97,18 @@ func resultType(call *ast.CallExpr) string {
 		}
 	case "syscall":
 		if name == "Flock" {
+			return "error"
+		}
+	case "counter":
+		if name == "CompareAndSwap" {
+			return "bool"
+		}
+	case "srv":
+		if name == "Shutdown" {
+			return "error"
+		}
+	case "store":
+		if name == "Close" {
 			return "error"
 		}
 	case "f", "file", "j.file", "lock", "d":
@@ -88,9 +144,40 @@ func instrument(path, relative string) error {
 			case *ast.DeferStmt, *ast.ExprStmt:
 				return false
 			}
+			if loop, ok := node.(*ast.ForStmt); ok && filepath.Base(relative) == "block.go" && fn.Name.Name == "GenerateWork" {
+				if init, ok := loop.Init.(*ast.AssignStmt); ok && len(init.Lhs) == 1 {
+					if name, ok := init.Lhs[0].(*ast.Ident); ok && name.Name == "nonce" {
+						id := "block.go/GenerateWork/nonce-start"
+						points = append(points, point{id, fn.Name.Name})
+						expression, err := parser.ParseExpr(`func()uint64{if _auditFail("block.go/GenerateWork/nonce-start"){return math.MaxUint64};return uint64(0)}()`)
+						if err != nil {
+							panic(err)
+						}
+						init.Rhs[0] = expression
+					}
+				}
+			}
 			call, ok := node.(*ast.CallExpr)
 			if !ok {
 				return true
+			}
+			if filepath.Base(relative) == "engine.go" && fn.Name.Name == "New" {
+				var target bytes.Buffer
+				format.Node(&target, sets, call.Fun)
+				if target.String() == "cfg.Store.Status" {
+					points = append(points, point{"engine.go/New/status-height-limit", fn.Name.Name})
+					original := *call
+					parsed, err := parser.ParseExpr(`func()ledger.Status{value:=PLACEHOLDER();if _auditFail("engine.go/New/status-height-limit"){value.Height=math.MaxUint64};return value}`)
+					if err != nil {
+						panic(err)
+					}
+					lit := parsed.(*ast.FuncLit)
+					lit.Body.List[0].(*ast.AssignStmt).Rhs = []ast.Expr{&original}
+					call.Fun = lit
+					call.Args = nil
+					call.Ellipsis = token.NoPos
+					return false
+				}
 			}
 			typ := resultType(call)
 			if typ == "" {
@@ -112,7 +199,10 @@ func instrument(path, relative string) error {
 			}
 			signature := "error"
 			returned := "_auditInjected"
-			if typ != "error" {
+			if typ == "bool" {
+				signature = "bool"
+				returned = "false"
+			} else if typ != "error" {
 				signature = "(" + typ + ",error)"
 				returned = zero + ",_auditInjected"
 			}
@@ -146,15 +236,24 @@ func instrument(path, relative string) error {
 }
 
 const helper = `package %s
-import("errors";"sync")
-var _auditInjected=errors.New("injected dependency failure")
-var _auditMu sync.Mutex
-var _auditSelected string
-var _auditNth,_auditCount int
-func _auditArm(site string,nth int){_auditMu.Lock();defer _auditMu.Unlock();_auditSelected=site;_auditNth=nth;_auditCount=0}
-func _auditFail(site string)bool{_auditMu.Lock();defer _auditMu.Unlock();if site!=_auditSelected{return false};_auditCount++;return _auditCount==_auditNth}
-func _auditReached()bool{_auditMu.Lock();defer _auditMu.Unlock();return _auditCount>=_auditNth && _auditNth>0}
+import "example.com/go-block-lattice/internal/faultprobe"
+var _auditInjected=faultprobe.Injected
+func _auditArm(site string,nth int){faultprobe.Arm(site,nth)}
+func _auditFail(site string)bool{return faultprobe.Fail(site)}
+func _auditReached()bool{return faultprobe.Reached()}
 var _auditPoints=[]struct{ID,Function string}{%s}
+`
+const probe = `package faultprobe
+import("errors";"sync")
+var Injected=errors.New("injected dependency failure")
+var mu sync.Mutex
+var selected string
+var nth,count int
+var action func()
+func Arm(site string,n int){mu.Lock();defer mu.Unlock();selected=site;nth=n;count=0;action=nil}
+func Before(site string,n int,fn func()){mu.Lock();defer mu.Unlock();selected=site;nth=n;count=0;action=fn}
+func Fail(site string)bool{mu.Lock();if site!=selected{mu.Unlock();return false};count++;hit:=count==nth;fn:=action;mu.Unlock();if hit&&fn!=nil{fn();return false};return hit}
+func Reached()bool{mu.Lock();defer mu.Unlock();return count>=nth && nth>0}
 `
 
 func main() {
@@ -216,4 +315,12 @@ func main() {
 			panic(err)
 		}
 	}
+	probeDir := filepath.Join(root, "internal", "faultprobe")
+	if err = os.MkdirAll(probeDir, 0700); err != nil {
+		panic(err)
+	}
+	if err = os.WriteFile(filepath.Join(probeDir, "probe.go"), []byte(probe), 0600); err != nil {
+		panic(err)
+	}
+
 }

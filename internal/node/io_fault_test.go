@@ -3,6 +3,7 @@
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -44,6 +45,28 @@ func TestConfigurationAndRepresentativeIOFailures(t *testing.T) {
 			}
 			if !errors.Is(err, _auditInjected) {
 				t.Fatalf("input I/O error lost: %v", err)
+			}
+		})
+	}
+}
+
+func TestNodeReportsShutdownAndCloseFailures(t *testing.T) {
+	for _, point := range _auditPoints {
+		if point.Function != "Run" {
+			continue
+		}
+		t.Run(point.ID, func(t *testing.T) {
+			cfg, _ := runtimeFixture(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			_auditArm(point.ID, 1)
+			defer _auditArm("", 0)
+			err := Run(ctx, cfg)
+			if !_auditReached() {
+				t.Fatal("fault site not reached")
+			}
+			if !errors.Is(err, _auditInjected) {
+				t.Fatalf("node cleanup error lost: %v", err)
 			}
 		})
 	}

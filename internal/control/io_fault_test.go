@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"example.com/go-block-lattice/internal/faultprobe"
 	"example.com/go-block-lattice/internal/protocol"
 	"io"
 	"os"
@@ -80,6 +81,40 @@ func TestAllocationDescriptorFailures(t *testing.T) {
 			}
 			if !errors.Is(err, _auditInjected) {
 				t.Fatalf("allocation descriptor error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTokenGrowthAfterStatRemainsBounded(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte("small"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	faultprobe.Before("control.go/controlSecret/io.ReadAll/1", 1, func() {
+		if err := os.WriteFile(path, make([]byte, (16<<10)+1), 0600); err != nil {
+			t.Fatal(err)
+		}
+	})
+	defer faultprobe.Arm("", 0)
+	if _, err := controlSecret(path); err == nil || !faultprobe.Reached() {
+		t.Fatal("growing token input exceeded read budget")
+	}
+}
+
+func TestTokenAndConfigEntropyErrorsArePropagated(t *testing.T) {
+	t.Setenv("BL_RPC_TOKEN", "")
+	for _, item := range []struct{ command, site string }{{"token", "control.go/RunControl/rand.Read/1"}, {"config", "control.go/RunControl/rand.Read/2"}} {
+		t.Run(item.command, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "output")
+			_auditArm(item.site, 1)
+			defer _auditArm("", 0)
+			err := RunControl(context.Background(), []string{item.command, "--out", path}, io.Discard, io.Discard)
+			if !_auditReached() || !errors.Is(err, _auditInjected) {
+				t.Fatalf("entropy error lost: %v", err)
+			}
+			if _, err = os.Stat(path); !os.IsNotExist(err) {
+				t.Fatal("entropy error published output")
 			}
 		})
 	}
