@@ -260,3 +260,11 @@ func TestLedgerFailedPersistenceAndPaginationBranches(t *testing.T) {
 		t.Fatal("directory WAL inspected")
 	}
 }
+
+func TestVoteSigningRejectsInvalidPayloadBeforeSignature(t *testing.T) {
+	_, key, _ := fixture(t)
+	vote := Vote{Representative: protocol.Address(key.Public().(ed25519.PublicKey))}
+	if err := vote.Sign(key); err == nil || vote.Signature != "" {
+		t.Fatal("malformed vote signed")
+	}
+}

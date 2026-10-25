@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -147,5 +148,48 @@ func TestRestoredObserverCannotPublishSigningState(t *testing.T) {
 	}
 	if err = Restore(filepath.Join(t.TempDir(), "bad"), bytes.NewReader(nil), protocol.Genesis{}); err == nil {
 		t.Fatal("restore accepted invalid genesis")
+	}
+}
+
+type duringRestoreReader struct {
+	reader  *bytes.Reader
+	before  func()
+	started bool
+}
+
+func (r *duringRestoreReader) Read(p []byte) (int, error) {
+	if !r.started {
+		r.started = true
+		r.before()
+	}
+	return r.reader.Read(p)
+}
+func TestRestoreRetainsFilesCreatedWhileBackupIsValidated(t *testing.T) {
+	state, _, _ := fixture(t)
+	s, err := Open(t.TempDir(), state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var archive bytes.Buffer
+	if err = s.Backup(&archive); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "target")
+	concurrent := filepath.Join(target, "operator-file")
+	reader := &duringRestoreReader{reader: bytes.NewReader(archive.Bytes()), before: func() {
+		if err := os.Mkdir(target, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(concurrent, []byte("retain"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	if err = Restore(target, reader, state.genesis); err == nil {
+		t.Fatal("restore overwrote a concurrently populated target")
+	}
+	raw, err := os.ReadFile(concurrent)
+	if err != nil || string(raw) != "retain" {
+		t.Fatal("concurrent operator data lost")
 	}
 }

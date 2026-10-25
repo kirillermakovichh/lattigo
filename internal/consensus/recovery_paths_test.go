@@ -192,3 +192,45 @@ func TestCommitRetainsIndependentPendingAndHonorsBroadcastFlag(t *testing.T) {
 		t.Fatal("quiet commit lost independent work or broadcast a record")
 	}
 }
+
+func TestDriveLimitsOneAdmissionToSixtyFourConfirmedBlocks(t *testing.T) {
+	f := makeFixture(65)
+	for i := range f.genesis.Allocations {
+		f.genesis.Allocations[i].Representative = f.accounts[0]
+	}
+	e, s := openEngine(t, f, 0)
+	for i := 1; i <= 64; i++ {
+		b := protocol.Block{Version: 1, Network: f.genesis.ID(), Kind: "send", Account: f.accounts[i], Representative: f.accounts[0], Balance: 99, Link: string(f.accounts[0])}
+		if err := b.Sign(f.keys[i]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.submit(b, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.drive(); err != nil {
+		t.Fatal(err)
+	}
+	if s.Status().Height != 64 || len(e.Pending()) != 0 {
+		t.Fatalf("bounded drive height=%d pending=%d", s.Status().Height, len(e.Pending()))
+	}
+	if err := e.drive(); err != nil || s.Status().Height != 64 {
+		t.Fatal("empty follow-up drive changed confirmed history")
+	}
+}
+
+func TestProposerRemovesCandidatesThatNoLongerValidate(t *testing.T) {
+	f := makeFixture(4)
+	e, s := openEngine(t, f, 0)
+	b := sendBlock(t, f)
+	e.pending[b.ID()] = b
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.propose(); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.pending) != 0 || len(e.outgoing) != 0 {
+		t.Fatal("unavailable candidate retained or proposed")
+	}
+}
