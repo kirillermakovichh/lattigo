@@ -21,7 +21,7 @@ import (
 
 func TestPrivateFileIOFailures(t *testing.T) {
 	for _, point := range _auditPoints {
-		if point.Function != "writeExclusive" && point.Function != "readPrivate" && point.Function != "lockAccount" {
+		if point.Function != "writeExclusive" && point.Function != "readPrivate" && point.Function != "lockPrivate" {
 			continue
 		}
 		t.Run(point.ID, func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestPrivateFileIOFailures(t *testing.T) {
 				err = WritePrivate(filepath.Join(dir, "new"), []byte("payload"))
 			case "readPrivate":
 				_, err = ReadSecret(path)
-			case "lockAccount":
+			case "lockPrivate":
 				_, err = lockAccount(path, 0)
 			}
 			if !_auditReached() {

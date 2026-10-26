@@ -12,7 +12,11 @@ var ErrAccountBusy = errors.New("another payment operation for this wallet accou
 // lockAccount serializes the entire read/check/remove/create outbox sequence.
 // Atomic creation alone cannot protect removal of an older confirmed outbox.
 func lockAccount(path string, index uint64) (*os.File, error) {
-	file, err := os.OpenFile(fmt.Sprintf("%s.account-%d.lock", path, index), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	return lockPrivate(fmt.Sprintf("%s.account-%d.lock", path, index))
+}
+
+func lockPrivate(path string) (*os.File, error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +27,7 @@ func lockAccount(path string, index uint64) (*os.File, error) {
 	}
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
 		file.Close()
-		return nil, errors.New("account lock must be a private regular file")
+		return nil, errors.New("wallet lock must be a private regular file")
 	}
 	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		file.Close()

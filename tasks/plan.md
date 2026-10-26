@@ -56,3 +56,14 @@ Use docs/implementation-contract.md as the frozen cross-agent contract.
 Merge coherent blocks with feature history preserved. Compile and verify at integration
 boundaries rather than after every edit. Fix integration-blocking defects immediately.
 Public deployment and external independent review are not implied by writing code.
+
+
+## Authorized product extension sequence
+
+Implement BL-024 through BL-119 from tasks/todo.md in dependency order: wallet,
+payment requests, RPC, events, peers, measured optimizations, operations and process
+resilience. Preserve protocol1 signing and monetary rules. New local metadata uses
+private bounded files and explicit locking; old wallet envelopes remain readable.
+HTTP extensions are additive and retain existing routes. Event subscribers have
+owned cancellation, bounded replay and explicit overload handling. Optimizations
+require benchmarks and reference invariants. No public launch or remote push is included.
