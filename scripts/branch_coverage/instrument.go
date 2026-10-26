@@ -18,6 +18,7 @@ import (
 )
 
 type site struct {
+	Function   string   `json:"function"`
 	ID         string   `json:"id"`
 	File       string   `json:"file"`
 	Line       int      `json:"line"`
@@ -29,6 +30,7 @@ type site struct {
 var sites []site
 var sets = token.NewFileSet()
 var sequence int
+var currentFunction string
 
 func str(s string) ast.Expr { return &ast.BasicLit{Kind: token.STRING, Value: strconv.Quote(s)} }
 func call(name string, args ...ast.Expr) *ast.CallExpr {
@@ -42,7 +44,7 @@ func add(path, kind string, node ast.Node, expr ast.Node, outcomes []string) str
 	if expr != nil {
 		format.Node(&text, sets, expr)
 	}
-	sites = append(sites, site{id, path, position.Line, kind, text.String(), outcomes})
+	sites = append(sites, site{currentFunction, id, path, position.Line, kind, text.String(), outcomes})
 	return id
 }
 func ranges(list []ast.Stmt, path string) []ast.Stmt {
@@ -77,6 +79,8 @@ func instrument(path, destination string) error {
 	changed := false
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
+		case *ast.FuncDecl:
+			currentFunction = n.Name.Name
 		case *ast.IfStmt:
 			id := add(path, "if", n, n.Cond, []string{"false", "true"})
 			n.Cond = call("Bool", str(id), &ast.CallExpr{Fun: ast.NewIdent("bool"), Args: []ast.Expr{n.Cond}})
@@ -146,6 +150,8 @@ func instrument(path, destination string) error {
 	// A separate pass keeps the generated empty-range check out of the inventory.
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
+		case *ast.FuncDecl:
+			currentFunction = n.Name.Name
 		case *ast.BlockStmt:
 			n.List = ranges(n.List, path)
 		case *ast.CaseClause:

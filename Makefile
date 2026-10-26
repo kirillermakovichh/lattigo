@@ -22,3 +22,7 @@ release:
 
 release-all:
 	python3 scripts/release.py --version $(VERSION) --all
+
+.PHONY: check-faults
+check-faults:
+	python3 scripts/branch_coverage.py --faults --race --network --strict

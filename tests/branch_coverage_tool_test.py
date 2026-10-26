@@ -1,6 +1,7 @@
 """Check instrumentation semantics and protect the working checkout/output files."""
 import json
 import os
+import runpy
 from pathlib import Path
 import subprocess
 import tempfile
@@ -62,6 +63,7 @@ class BranchInstrumentation(unittest.TestCase):
             for path in hits.glob("*.json"):
                 observed.update(json.loads(path.read_text()))
             for site in json.loads(inventory.read_text()):
+                self.assertIn(site["function"], {"Decide", "Sum"})
                 for outcome in site["outcomes"]:
                     self.assertGreater(observed.get(site["id"], {}).get(outcome, 0), 0,
                                        (site["expression"], outcome))
@@ -82,7 +84,7 @@ func Write(path string)error{
 }
 ''')
             (sample / "sample_test.go").write_text('''package sample
-import("errors";"os";"path/filepath";"testing")
+import("errors";"os";"path/filepath";"testing";"example.com/go-block-lattice/internal/faultprobe")
 func TestInjection(t *testing.T){
  dir:=t.TempDir()
  normal:=filepath.Join(dir,"normal")
@@ -94,6 +96,14 @@ func TestInjection(t *testing.T){
   if !errors.Is(err,_auditInjected)||!_auditReached(){t.Fatalf("fault not propagated: %s %v",point.ID,err)}
   _auditArm("",0)
  }
+ _auditArm("sample.go/Write/f.Write/1",2)
+ if err:=Write(filepath.Join(t.TempDir(),"first"));err!=nil{t.Fatal("fault triggered before selected invocation")}
+ if err:=Write(filepath.Join(t.TempDir(),"second"));!errors.Is(err,_auditInjected){t.Fatal("selected invocation not rejected")}
+ _auditArm("",0)
+ actions:=0
+ faultprobe.Before("sample.go/Write/f.Write/1",1,func(){actions++})
+ if err:=Write(filepath.Join(t.TempDir(),"action"));err!=nil||actions!=1{t.Fatal("action changed normal operation result")}
+ _auditArm("",0)
 }
 ''')
             env = dict(os.environ, GOCACHE=str(ROOT / ".cache/go-build"))
@@ -107,6 +117,15 @@ func TestInjection(t *testing.T){
                                     cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual((sample / "sample.go").read_bytes(), before)
+
+    def test_invariant_exclusions_require_exact_function_and_outcome(self):
+        exclusion = runpy.run_path(str(ROOT / "scripts/branch_coverage/contracts.py"))["exclusion"]
+        site = {"file": "internal/rpc/server.go", "function": "ready", "kind": "if", "expression": "ok"}
+        self.assertIsNotNone(exclusion(site, "false"))
+        self.assertIsNone(exclusion(site, "true"))
+        self.assertIsNone(exclusion(dict(site, function="anotherHandler"), "false"))
+        self.assertIsNone(exclusion(dict(site, expression="anotherCondition"), "false"))
+        self.assertIsNone(exclusion(dict(site, file="internal/other/server.go"), "false"))
 
     def test_existing_unowned_output_is_preserved(self):
         with tempfile.TemporaryDirectory(prefix="bl-audit-output-test-") as temporary:
