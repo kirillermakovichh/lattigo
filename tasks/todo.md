@@ -331,7 +331,7 @@ coverage commits.
 
 ## BL-023: Audit decision outcomes across the implementation
 
-- [ ] Complete
+- [x] Complete
 
 **Dependencies:** BL-022.
 
@@ -343,5 +343,7 @@ invariant-excluded and fault-injection-dependent paths without coverage reports 
 **Verification:** Isolated decision measurement plus ordinary-source make check and
 real-process network workflow. Each observed behavioral correction has a separate commit.
 
-**Implementation evidence:** In progress. Tests and executable checks are the evidence;
-coverage output stays in ignored temporary artifacts.
+**Implementation evidence:** make check and the strict failure/network gate pass.
+Unobserved structural outcomes require exact function-specific invariant contracts;
+unknown gaps fail the gate. Faults and numeric boundary overrides exist only in
+disposable source copies. Verification reports were removed at the user’s request.
