@@ -162,3 +162,18 @@ func TestRPCStorageAndDuplicateFailureBranches(t *testing.T) {
 		t.Fatal("closed storage backed up")
 	}
 }
+
+func TestAnonymousBackupAndAbsentPeerMetrics(t *testing.T) {
+	s, _ := branchServer(t)
+	out := httptest.NewRecorder()
+	s.Handler().ServeHTTP(out, httptest.NewRequest("GET", "/v1/admin/backup", nil))
+	if out.Code != 401 {
+		t.Fatal("unauthenticated backup admitted")
+	}
+	out = httptest.NewRecorder()
+	s.cfg.PeerStats = nil
+	s.Handler().ServeHTTP(out, httptest.NewRequest("GET", "/metrics", nil))
+	if out.Code != 200 || strings.Contains(out.Body.String(), "bl_p2p_") {
+		t.Fatal("absent peer metrics not handled")
+	}
+}

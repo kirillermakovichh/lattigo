@@ -81,7 +81,7 @@ func TestAdministrationArgumentAndFileBranches(t *testing.T) {
 	a := protocol.Address(key.Public().(ed25519.PublicKey))
 	other := protocol.Address(ed25519.NewKeyFromSeed([]byte(strings.Repeat("x", 32))).Public().(ed25519.PublicKey))
 	allocations := filepath.Join(dir, "allocations.json")
-	cases := [][]byte{[]byte("{"), []byte("[]{}")}
+	cases := [][]byte{[]byte("{"), []byte("[]{}"), []byte("[]")}
 	overflow, _ := json.Marshal([]protocol.Allocation{{Account: a, Balance: protocol.Amount(math.MaxUint64), Representative: a}, {Account: other, Balance: 1, Representative: a}})
 	cases = append(cases, overflow)
 	for _, raw := range cases {
@@ -159,5 +159,58 @@ func TestAdministrationHTTPAndRestoreOutcomes(t *testing.T) {
 	server.Close()
 	if RunControl(context.Background(), args, io.Discard, io.Discard) == nil {
 		t.Fatal("unavailable server accepted")
+	}
+}
+
+func TestAdministrationExplicitInputsAndPublicationFailures(t *testing.T) {
+	dir := t.TempDir()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	token := filepath.Join(dir, "token")
+	if err := os.WriteFile(token, []byte(strings.Repeat("t", 32)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "node.json")
+	if err := RunControl(context.Background(), []string{"config", "--token-file", token, "--out", config}, io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunControl(context.Background(), []string{"config", "--token-file", token, "--out", config}, io.Discard, io.Discard); err == nil {
+		t.Fatal("config overwritten")
+	}
+	manifest := filepath.Join(dir, "genesis.json")
+	args := []string{"genesis", "--name", "explicit-representative", "--account", string(a), "--representative", string(a), "--balance", "100", "--out", manifest}
+	if err := RunControl(context.Background(), args, io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunControl(context.Background(), args, io.Discard, io.Discard); err == nil {
+		t.Fatal("genesis overwritten")
+	}
+	if err := RunControl(context.Background(), []string{"token", "--out", token}, io.Discard, io.Discard); err == nil {
+		t.Fatal("token overwritten")
+	}
+	if err := writeJSONNew(filepath.Join(dir, "unsupported"), make(chan int)); err == nil {
+		t.Fatal("unencodable output published")
+	}
+}
+
+func TestRestoreCommandRejectsUnverifiedArchive(t *testing.T) {
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	g := protocol.Genesis{Version: 1, Name: "invalid-restore", Supply: 1, Allocations: []protocol.Allocation{{Account: a, Balance: 1, Representative: a}}}
+	dir := t.TempDir()
+	manifest := filepath.Join(dir, "genesis")
+	backup := filepath.Join(dir, "backup")
+	raw, err := json.Marshal(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(manifest, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(backup, []byte("invalid archive"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = RunControl(context.Background(), []string{"restore", "--genesis", manifest, "--backup", backup, "--data-dir", filepath.Join(dir, "data")}, io.Discard, io.Discard); err == nil {
+		t.Fatal("unverified archive restored")
 	}
 }

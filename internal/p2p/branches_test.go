@@ -402,3 +402,24 @@ func TestCertifiedPeerPagesEncodeMultipleRecords(t *testing.T) {
 		t.Fatal("certified page ordering or size invalid")
 	}
 }
+
+func TestPublisherDrainsWithoutConfiguredPeers(t *testing.T) {
+	n := branchNetwork(t)
+	n.Publish(consensus.Message{Type: "unknown"})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- n.Run(ctx) }()
+	deadline := time.After(time.Second)
+	for n.queued.Load() != 0 {
+		select {
+		case <-deadline:
+			t.Fatal("publisher without peers did not drain")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
