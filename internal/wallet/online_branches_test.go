@@ -47,6 +47,22 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 		args          []string
 		success       bool
 	}{
+		{"genesis unavailable", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"payment status unavailable", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"payment account unavailable", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"frontier unavailable", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"source unavailable", "receive", nil, false},
+		{"receivables unavailable", "receive", nil, false},
+		{"receivable search limit", "receive", nil, false},
+		{"output published", "send", []string{"--to", string(sender), "--amount", "1"}, true},
+		{"later receivable page", "receive", nil, true},
+		{"pending confirmed", "send", []string{"--to", string(sender), "--amount", "1"}, true},
+		{"account lock unavailable", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"corrupt pending", "send", []string{"--to", string(sender), "--amount", "1"}, false},
+		{"derived missing wallet", "account", []string{"--wallet", "/definitely/missing/wallet.json"}, false},
+		{"history unavailable", "history", []string{"--address", string(a)}, false},
+		{"account unavailable", "account", []string{"--address", string(a)}, false},
+		{"receivables query unavailable", "receivables", []string{"--address", string(a)}, false},
 		{"pinned network", "send", []string{"--to", string(sender), "--amount", "1", "--expected-network", string(protocol.Digest([]byte("other")))}, false},
 		{"status network", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"genesis metadata", "send", []string{"--to", string(sender), "--amount", "1"}, false},
@@ -105,7 +121,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 			if err := pending.Sign(key); err != nil {
 				t.Fatal(err)
 			}
-			if item.name == "pending unresolved" {
+			if item.name == "pending unresolved" || item.name == "pending confirmed" {
 				raw, err := json.Marshal(pending)
 				if err != nil {
 					t.Fatal(err)
@@ -114,14 +130,28 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if item.name == "account lock unavailable" {
+				if err := os.Mkdir(path+".account-0.lock", 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if item.name == "corrupt pending" {
+				if err := WritePrivate(path+".pending-0.json", []byte("{")); err != nil {
+					t.Fatal(err)
+				}
+			}
 			var submitted protocol.Block
 			server := httptest.NewServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
 				var response any
 				switch r.URL.Path {
 				case "/v1/genesis":
+					if item.name == "genesis unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					response = g
 				case "/v1/status":
-					if item.name == "status unavailable" {
+					if item.name == "status unavailable" || item.name == "payment status unavailable" {
 						http.Error(out, "unavailable", 503)
 						return
 					}
@@ -131,6 +161,10 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					}
 					response = status
 				case "/v1/account":
+					if item.name == "payment account unavailable" || item.name == "account unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					if item.name == "opening representative" || item.name == "default opening representative" {
 						out.WriteHeader(404)
 						response = map[string]any{"error": map[string]string{"code": "not_found"}}
@@ -140,12 +174,12 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					if item.name == "genesis metadata" {
 						state.Balance = 99
 					}
-					if item.name == "signed frontier metadata" {
+					if item.name == "signed frontier metadata" || item.name == "frontier unavailable" {
 						state.Frontier = source.ID()
 					}
 					response = state
 				case "/v1/block":
-					if item.name == "block unavailable" {
+					if item.name == "block unavailable" || item.name == "source unavailable" || item.name == "frontier unavailable" {
 						http.Error(out, "unavailable", 503)
 						return
 					}
@@ -159,13 +193,30 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 						}
 						break
 					}
+					if item.name == "pending confirmed" && r.URL.Query().Get("id") == string(pending.ID()) {
+						response = pending
+						break
+					}
 					if submitted.ID() != "" && r.URL.Query().Get("id") == string(submitted.ID()) {
 						response = submitted
 					} else {
 						response = source
 					}
 				case "/v1/receivables":
+					if item.name == "receivables unavailable" || item.name == "receivables query unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					rows := []client.Receivable{{Source: source.ID(), From: sender, To: a, Amount: 20}}
+					if item.name == "later receivable page" && r.URL.Query().Get("offset") == "0" {
+						rows = make([]client.Receivable, 1000)
+						for i := range rows {
+							rows[i] = client.Receivable{Source: protocol.Digest([]byte("another source")), From: sender, To: a, Amount: 1}
+						}
+					}
+					if item.name == "receivable search limit" {
+						rows = make([]client.Receivable, 1000)
+					}
 					if item.name == "consumed source" {
 						rows = nil
 					}
@@ -174,6 +225,10 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					}
 					response = rows
 				case "/v1/history":
+					if item.name == "history unavailable" {
+						http.Error(out, "unavailable", 503)
+						return
+					}
 					response = []any{}
 				case "/v1/blocks":
 					if err := json.NewDecoder(r.Body).Decode(&submitted); err != nil {
@@ -202,6 +257,12 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 			}
 			if item.command == "receive" && item.name != "missing source" {
 				args = append(args, "--source", string(source.ID()))
+			}
+			if item.name == "receivable search limit" {
+				args = append(args, "--timeout", "60s")
+			}
+			if item.name == "output published" {
+				args = append(args, "--out", filepath.Join(dir, "signed.json"))
 			}
 			if item.name == "output collision" {
 				out := filepath.Join(dir, "existing")
