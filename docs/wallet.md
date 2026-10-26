@@ -46,6 +46,9 @@ AES-256-GCM with a random 12-byte nonce and versioned authenticated data.
 Encrypted backup/restore verifies the password and preserves the encrypted envelope.
 Creation, backup, restore and explicit exports refuse to overwrite existing files.
 Writes sync the file and directory. Unsupported envelope/KDF versions fail closed.
+Use `blwallet password --wallet PATH --password-file OLD --new-password-file NEW`
+to change a passphrase. Environment alternatives are `BL_WALLET_PASSWORD` and
+`BL_WALLET_NEW_PASSWORD`; no passphrases are accepted as command-line literals.
 Password rotation atomically re-encrypts the same seed under a custody lock. Account
 identities stay unchanged; earlier backups retain their earlier passphrases.
 Losing the seed and all backups permanently loses access to funds.
