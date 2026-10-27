@@ -362,7 +362,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | --- | --- | --- | --- |
 | BL-024 | [x] | Password rotation atomically preserves derived identities | Focused Go tests and race checks |
 | BL-025 | [x] | Password command accepts old and new secrets through files or environment | Focused Go tests and race checks |
-| BL-026 | [ ] | Interrupted password replacement retains a readable wallet | Focused Go tests and race checks |
+| BL-026 | [x] | Interrupted password replacement retains a readable wallet | Focused Go tests and race checks |
 | BL-027 | [ ] | Private address book persists bounded validated contacts | Focused Go tests and race checks |
 | BL-028 | [ ] | Contact commands add list and remove named recipients | Focused Go tests and race checks |
 | BL-029 | [ ] | Named contacts resolve send destinations with network pins | Focused Go tests and race checks |

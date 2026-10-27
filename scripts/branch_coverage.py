@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / ".cache/branches")
+    parser.add_argument("--run", help="run matching Go tests in the isolated copy")
     parser.add_argument("--strict", action="store_true", help="reject uncovered outcomes without an exact invariant contract")
     parser.add_argument("--race", action="store_true", help="race-check isolated test processes")
     parser.add_argument("--faults", action="store_true", help="inject I/O failures in the isolated source copy")
@@ -42,6 +43,8 @@ def main():
         test_command = ["go", "test", "-count=1"]
         if args.race:
             test_command += ["-race"]
+        if args.run:
+            test_command += ["-run", args.run]
         if args.faults:
             subprocess.run(["go", "run", str(ROOT / "scripts/fault_injection/instrument.go"), str(copy)],
                            cwd=ROOT, env=env, check=True)
