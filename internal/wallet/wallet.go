@@ -222,7 +222,9 @@ func decrypt(data, password []byte) ([]byte, error) {
 	return seed, nil
 }
 
-func readPrivate(path string) ([]byte, error) {
+func readPrivate(path string) ([]byte, error) { return readPrivateLimit(path, maxFileSize) }
+
+func readPrivateLimit(path string, limit int64) ([]byte, error) {
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open private file: %w", err)
@@ -235,14 +237,14 @@ func readPrivate(path string) ([]byte, error) {
 	if !st.Mode().IsRegular() || st.Mode().Perm()&0077 != 0 {
 		return nil, errors.New("secret input must be a regular file with permissions 0600 or stricter")
 	}
-	if st.Size() > maxFileSize {
+	if st.Size() > limit {
 		return nil, errors.New("private file exceeds size limit")
 	}
-	data, err := io.ReadAll(io.LimitReader(f, maxFileSize+1))
+	data, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(data) > maxFileSize {
+	if int64(len(data)) > limit {
 		return nil, errors.New("private file exceeds size limit")
 	}
 	return data, nil

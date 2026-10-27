@@ -21,7 +21,7 @@ import (
 
 func TestPrivateFileIOFailures(t *testing.T) {
 	for _, point := range _auditPoints {
-		if point.Function != "writeExclusive" && point.Function != "readPrivate" && point.Function != "lockPrivate" {
+		if point.Function != "writeExclusive" && point.Function != "readPrivateLimit" && point.Function != "lockPrivate" {
 			continue
 		}
 		t.Run(point.ID, func(t *testing.T) {
@@ -36,7 +36,7 @@ func TestPrivateFileIOFailures(t *testing.T) {
 			switch point.Function {
 			case "writeExclusive":
 				err = WritePrivate(filepath.Join(dir, "new"), []byte("payload"))
-			case "readPrivate":
+			case "readPrivateLimit":
 				_, err = ReadSecret(path)
 			case "lockPrivate":
 				_, err = lockAccount(path, 0)
@@ -178,7 +178,7 @@ func TestPrivateInputGrowthAfterStatRemainsBounded(t *testing.T) {
 	if err := os.WriteFile(path, []byte("small"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	faultprobe.Before("wallet.go/readPrivate/io.ReadAll/1", 1, func() {
+	faultprobe.Before("wallet.go/readPrivateLimit/io.ReadAll/1", 1, func() {
 		if err := os.WriteFile(path, make([]byte, maxFileSize+1), 0600); err != nil {
 			t.Fatal(err)
 		}
