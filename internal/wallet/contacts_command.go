@@ -13,10 +13,11 @@ func contactsCommand(args []string, out, errout io.Writer) error {
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
-	action := fs.String("action", "list", "list, add or remove")
+	action := fs.String("action", "list", "list, add, remove, import or export")
 	name := fs.String("name", "", "contact name")
 	address := fs.String("address", "", "recipient account")
 	network := fs.String("network", "", "recipient network hash")
+	file := fs.String("file", "", "private contact archive for import or export")
 	replace := fs.Bool("replace", false, "explicitly replace an existing contact")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -38,12 +39,26 @@ func contactsCommand(args []string, out, errout io.Writer) error {
 		if err := PutContact(f.path, *name, Contact{Address: protocol.Account(*address), Network: protocol.Hash(*network)}, *replace); err != nil {
 			return err
 		}
+	case "export":
+		if *file == "" {
+			return errors.New("--file is required")
+		}
+		if err := ExportContacts(f.path, *file); err != nil {
+			return err
+		}
+	case "import":
+		if *file == "" {
+			return errors.New("--file is required")
+		}
+		if err := ImportContacts(f.path, *file, *replace); err != nil {
+			return err
+		}
 	case "remove":
 		if err := DeleteContact(f.path, *name); err != nil {
 			return err
 		}
 	default:
-		return errors.New("contact action must be list, add or remove")
+		return errors.New("contact action must be list, add, remove, import or export")
 	}
 	return output(out, map[string]string{"name": *name, "status": "complete"})
 }

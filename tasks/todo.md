@@ -366,7 +366,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-027 | [x] | Private address book persists bounded validated contacts | Focused Go tests and race checks |
 | BL-028 | [x] | Contact commands add list and remove named recipients | Focused Go tests and race checks |
 | BL-029 | [x] | Named contacts resolve send destinations with network pins | Focused Go tests and race checks |
-| BL-030 | [ ] | Contact import and export preserve explicit merge rules | Focused Go tests and race checks |
+| BL-030 | [x] | Contact import and export preserve explicit merge rules | Focused Go tests and race checks |
 | BL-031 | [ ] | Contact corruption and concurrent updates fail safely | Focused Go tests and race checks |
 | BL-032 | [ ] | Account labels persist deterministic account indexes | Focused Go tests and race checks |
 | BL-033 | [ ] | Account-name flags resolve indexes without ambiguous overrides | Focused Go tests and race checks |
