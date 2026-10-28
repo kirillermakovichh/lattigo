@@ -83,6 +83,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 		{"output collision", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"submit rejected", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"wait unavailable", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, false},
+		{"contact acknowledged", "send", []string{"--contact", "Sender", "--amount", "1"}, true},
 		{"send acknowledged", "send", []string{"--to", string(sender), "--amount", "1"}, true},
 		{"send confirmed", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, true},
 		{"receive acknowledged", "receive", nil, true},
@@ -137,6 +138,11 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 			}
 			if item.name == "corrupt pending" {
 				if err := WritePrivate(path+".pending-0.json", []byte("{")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if item.name == "contact acknowledged" {
+				if err := PutContact(path, "Sender", Contact{Address: sender, Network: g.ID()}, false); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -280,6 +286,9 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 				if _, err := os.Stat(path + ".pending-0.json"); err != nil {
 					t.Fatal("output failure lost signed outbox")
 				}
+			}
+			if item.name == "contact acknowledged" && submitted.Link != string(sender) {
+				t.Fatal("contact payment signed another destination")
 			}
 			if item.success && !json.Valid(stdout.Bytes()) {
 				t.Fatal("successful command did not return JSON")

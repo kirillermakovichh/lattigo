@@ -108,7 +108,7 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
-	var seedFile, backup, address, to, amount, source, representative, kind, previous, balance, network, link, file string
+	var seedFile, backup, address, to, amount, source, representative, kind, previous, balance, network, link, file, contact string
 	var count, offset, limit int
 	var workBits uint
 	var wait bool
@@ -121,6 +121,7 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	case "accounts":
 		fs.IntVar(&count, "count", 1, "number of accounts (1..1000)")
 	case "send":
+		fs.StringVar(&contact, "contact", "", "named recipient from the private address book")
 		fs.StringVar(&to, "to", "", "destination account")
 		fs.StringVar(&amount, "amount", "", "positive raw amount")
 		fs.BoolVar(&wait, "wait", false, "wait until confirmed")
@@ -163,6 +164,14 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	}
 	if f.timeout <= 0 {
 		return errors.New("timeout must be positive")
+	}
+	if contact != "" {
+		account, network, err := contactDestination(f, contact, to)
+		if err != nil {
+			return err
+		}
+		to = string(account)
+		f.expectedNetwork = string(network)
 	}
 	ctx, cancel := context.WithTimeout(ctx, f.timeout)
 	defer cancel()
