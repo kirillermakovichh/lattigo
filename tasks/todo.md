@@ -368,7 +368,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-029 | [x] | Named contacts resolve send destinations with network pins | Focused Go tests and race checks |
 | BL-030 | [x] | Contact import and export preserve explicit merge rules | Focused Go tests and race checks |
 | BL-031 | [x] | Contact corruption and concurrent updates fail safely | Focused Go tests and race checks |
-| BL-032 | [ ] | Account labels persist deterministic account indexes | Focused Go tests and race checks |
+| BL-032 | [x] | Account labels persist deterministic account indexes | Focused Go tests and race checks |
 | BL-033 | [ ] | Account-name flags resolve indexes without ambiguous overrides | Focused Go tests and race checks |
 | BL-034 | [ ] | Outbox command inspects exact durable signed intent | Focused Go tests and race checks |
 | BL-035 | [ ] | Outbox retry resubmits the original signed block | Focused Go tests and race checks |
