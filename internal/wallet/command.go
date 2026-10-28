@@ -22,9 +22,9 @@ import (
 )
 
 type commandFlags struct {
-	path, passwordFile, rpc, tokenFile, out, expectedNetwork string
-	index                                                    uint64
-	timeout                                                  time.Duration
+	path, passwordFile, rpc, tokenFile, out, expectedNetwork, accountName string
+	index                                                                 uint64
+	timeout                                                               time.Duration
 }
 
 func (f *commandFlags) add(fs *flag.FlagSet) {
@@ -34,6 +34,7 @@ func (f *commandFlags) add(fs *flag.FlagSet) {
 	fs.StringVar(&f.tokenFile, "token-file", "", "0600 file containing RPC token; otherwise BL_RPC_TOKEN")
 	fs.StringVar(&f.out, "out", "", "exclusive output file")
 	fs.StringVar(&f.expectedNetwork, "expected-network", "", "optional pinned genesis hash for online payments")
+	fs.StringVar(&f.accountName, "account-name", "", "named local account instead of --index")
 	fs.Uint64Var(&f.index, "index", 0, "deterministic account index")
 	fs.DurationVar(&f.timeout, "timeout", 30*time.Second, "operation timeout")
 }
@@ -164,6 +165,9 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	}
 	if fs.NArg() != 0 {
 		return errors.New("unexpected positional arguments")
+	}
+	if err := f.resolveAccountName(fs); err != nil {
+		return err
 	}
 	if f.timeout <= 0 {
 		return errors.New("timeout must be positive")
