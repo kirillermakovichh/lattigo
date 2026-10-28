@@ -370,7 +370,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-031 | [x] | Contact corruption and concurrent updates fail safely | Focused Go tests and race checks |
 | BL-032 | [x] | Account labels persist deterministic account indexes | Focused Go tests and race checks |
 | BL-033 | [x] | Account-name flags resolve indexes without ambiguous overrides | Focused Go tests and race checks |
-| BL-034 | [ ] | Outbox command inspects exact durable signed intent | Focused Go tests and race checks |
+| BL-034 | [x] | Outbox command inspects exact durable signed intent | Focused Go tests and race checks |
 | BL-035 | [ ] | Outbox retry resubmits the original signed block | Focused Go tests and race checks |
 | BL-036 | [ ] | Confirmed outbox cleanup checks confirmation under the account lock | Focused Go tests and race checks |
 | BL-037 | [ ] | Wallet command workflows document and exercise new custody operations | Focused Go tests and race checks |
