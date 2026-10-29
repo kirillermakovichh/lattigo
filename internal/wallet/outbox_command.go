@@ -12,7 +12,7 @@ func outboxCommand(ctx context.Context, args []string, out, errout io.Writer) er
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
-	action := fs.String("action", "inspect", "inspect or retry stored signed intent")
+	action := fs.String("action", "inspect", "inspect, retry or clear confirmed intent")
 	wait := fs.Bool("wait", false, "wait for confirmation when retrying")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -34,11 +34,14 @@ func outboxCommand(ctx context.Context, args []string, out, errout io.Writer) er
 	}
 	ctx, cancel := context.WithTimeout(ctx, f.timeout)
 	defer cancel()
+	if *action == "clear" {
+		return clearOutbox(ctx, f, out)
+	}
 	if *action == "retry" {
 		return retryOutbox(ctx, f, *wait, out)
 	}
 	if *action != "inspect" {
-		return errors.New("outbox action must be inspect or retry")
+		return errors.New("outbox action must be inspect, retry or clear")
 	}
 	entry, err := InspectOutbox(f.path, f.index)
 	if err != nil {
