@@ -1,10 +1,7 @@
 # Session handoff
 
-Protocol, ledger, consensus, P2P, RPC, wallet and operator workflows are implemented.
-Only main exists; no extra worktrees or remote actions.
-
-BL-023 is complete. make check, the strict fault/race/network gate and the ordinary
-binary network scenario pass. Reproduce the extended gate with make check-faults.
-Verification reports were removed at the user’s request; keep evidence in executable
-tests and keep coverage output temporary. Generated binaries and caches were removed.
-Public-release tasks BL-020/BL-021 remain open.
+The authorized product extension plan is tracked only in tasks/todo.md (BL-024..BL-119).
+Wallet extensions BL-024..BL-037 are complete; focused race checks, make check and the
+owned wallet CLI process workflow pass. Next: payment request and batch-receive features.
+Preserve local meaningful commits toward the authorized total of208. No verification
+reports, remote actions or public deployment. Public-release tasks BL-020/BL-021 remain open.

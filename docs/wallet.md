@@ -169,3 +169,28 @@ backup, restores an observer and confirms another transfer across all five proce
 It uses bounded deadlines and cleans up child processes and temporary secrets.
 This scenario passed at confirmed height 5 with recipient balance 30 raw units. It is
 a functional integration check, not an external review or sustained capacity benchmark.
+
+## Contacts, account names and outbox administration
+
+`blwallet contacts --wallet PATH` lists private named recipients in name order.
+Use `--action add --name NAME --address ADDRESS --network HASH` to add one;
+`--replace` is required to change an existing recipient. `--action remove --name NAME`
+deletes it. `--action export --file FILE` creates a private exclusive contact archive;
+`--action import --file FILE` merges it atomically. Conflicting names require `--replace`.
+`send --contact NAME --amount VALUE` uses the saved destination and pins its network.
+It cannot be combined with `--to` or a conflicting `--expected-network`.
+
+`blwallet names --action add --name Savings --index 9 --wallet PATH` records a local
+account label. List with `names`, remove with `names --action remove --name NAME`, and
+select with `--account-name Savings` on account/payment commands. An explicit `--index`
+cannot be combined with `--account-name`. Contacts and account labels have separate namespaces.
+Metadata lives in the private, bounded `PATH.profile.json` sidecar. Wallet backup/restore
+continues to protect the encrypted seed; keep metadata separately when preserving names.
+Contact archives do not contain seeds, passphrases or account labels.
+
+`blwallet outbox --wallet PATH --index N` verifies and inspects saved signed intent,
+without claiming admission or confirmation and without requiring the wallet password.
+`outbox --action retry` authenticates the selected wallet, checks the RPC network and
+resubmits the same signed block under the account lock. Optional `--wait` waits for confirmation.
+`outbox --action clear` requires successful confirmed lookup before removing and syncing
+that account's outbox. Neither command invents a replacement for uncertain intent.
