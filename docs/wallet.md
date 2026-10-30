@@ -194,3 +194,12 @@ without claiming admission or confirmation and without requiring the wallet pass
 resubmits the same signed block under the account lock. Optional `--wait` waits for confirmation.
 `outbox --action clear` requires successful confirmed lookup before removing and syncing
 that account's outbox. Neither command invents a replacement for uncertain intent.
+
+## Payment request format
+
+An off-chain payment request uses `blpay:ADDRESS?amount=RAW&network=HASH`, with optional
+`label` (64 UTF-8 bytes) and `message` (256 UTF-8 bytes). Amount is a positive canonical
+raw-unit integer; network is the explicit genesis hash. Repeated or unknown fields,
+authorities, fragments, control characters and inputs above2048 bytes are rejected.
+Formatting sorts and escapes query fields deterministically. Labels and messages are
+request metadata and do not become fields of signed blocks or ledger history.

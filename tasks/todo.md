@@ -379,7 +379,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
-| BL-038 | [ ] | Canonical payment URIs carry address amount and explicit network | Focused Go tests and race checks |
+| BL-038 | [x] | Canonical payment URIs carry address amount and explicit network | Focused Go tests and race checks |
 | BL-039 | [ ] | Request command creates payment URIs for an account | Focused Go tests and race checks |
 | BL-040 | [ ] | Request inspection validates untrusted payment URIs | Focused Go tests and race checks |
 | BL-041 | [ ] | Send accepts network-pinned payment URIs | Focused Go tests and race checks |
