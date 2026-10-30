@@ -15,7 +15,24 @@ type requestResult struct {
 	payment.Request
 }
 
-func requestOutput(f commandFlags, out io.Writer, r payment.Request) error {
+func requestOutput(f commandFlags, out io.Writer, r payment.Request, format string) error {
+	if format == "json" {
+		raw, err := payment.EncodeFile(r)
+		if err != nil {
+			return err
+		}
+		raw = append(raw, '\n')
+		if f.out != "" {
+			if err := WritePrivate(f.out, raw); err != nil {
+				return err
+			}
+		}
+		_, err = out.Write(raw)
+		return err
+	}
+	if format != "uri" {
+		return errors.New("request format must be uri or json")
+	}
 	uri, err := r.URI()
 	if err != nil {
 		return err
@@ -32,6 +49,7 @@ func requestCommand(ctx context.Context, args []string, out, errout io.Writer) e
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
+	format := fs.String("format", "uri", "uri or versioned json")
 	action := fs.String("action", "create", "create or inspect a payment request")
 	uri := fs.String("uri", "", "payment URI to inspect")
 	address := fs.String("address", "", "recipient address; defaults to selected wallet account")
@@ -62,7 +80,7 @@ func requestCommand(ctx context.Context, args []string, out, errout io.Writer) e
 		if err != nil {
 			return err
 		}
-		return requestOutput(f, out, request)
+		return requestOutput(f, out, request, *format)
 	}
 	if *action != "create" || *uri != "" {
 		return errors.New("request action must be create or inspect; --uri is for inspection")
@@ -86,5 +104,5 @@ func requestCommand(ctx context.Context, args []string, out, errout io.Writer) e
 			return err
 		}
 	}
-	return requestOutput(f, out, payment.Request{Address: recipient, Network: protocol.Hash(*network), Amount: value, Label: *label, Message: *message})
+	return requestOutput(f, out, payment.Request{Address: recipient, Network: protocol.Hash(*network), Amount: value, Label: *label, Message: *message}, *format)
 }

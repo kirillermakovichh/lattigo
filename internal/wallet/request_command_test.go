@@ -33,3 +33,20 @@ func TestRequestCommandDoesNotNeedKeysForExplicitRecipient(t *testing.T) {
 		t.Fatal("request output changed URI")
 	}
 }
+
+func TestRequestCommandCreatesVersionedJSONFile(t *testing.T) {
+	_, c := profileFixture(t)
+	path := filepath.Join(t.TempDir(), "request.json")
+	var out bytes.Buffer
+	if err := RunCommand(context.Background(), []string{"request", "--address", string(c.Address), "--network", string(c.Network), "--amount", "4", "--format", "json", "--out", path}, &out, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	request, err := payment.DecodeFile(out.Bytes())
+	if err != nil || request.Amount != 4 {
+		t.Fatal("JSON request command returned an invalid envelope")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(raw, out.Bytes()) {
+		t.Fatal("saved request differs from displayed request")
+	}
+}
