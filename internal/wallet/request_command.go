@@ -32,6 +32,8 @@ func requestCommand(ctx context.Context, args []string, out, errout io.Writer) e
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
+	action := fs.String("action", "create", "create or inspect a payment request")
+	uri := fs.String("uri", "", "payment URI to inspect")
 	address := fs.String("address", "", "recipient address; defaults to selected wallet account")
 	network := fs.String("network", "", "explicit genesis hash")
 	amount := fs.String("amount", "", "positive raw amount")
@@ -48,6 +50,22 @@ func requestCommand(ctx context.Context, args []string, out, errout io.Writer) e
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if f.timeout <= 0 {
+		return errors.New("timeout must be positive")
+	}
+	if *action == "inspect" {
+		if *address != "" || *network != "" || *amount != "" || *label != "" || *message != "" {
+			return errors.New("inspection cannot override payment URI fields")
+		}
+		request, err := payment.ParseURI(*uri)
+		if err != nil {
+			return err
+		}
+		return requestOutput(f, out, request)
+	}
+	if *action != "create" || *uri != "" {
+		return errors.New("request action must be create or inspect; --uri is for inspection")
 	}
 	if err := f.resolveAccountName(fs); err != nil {
 		return err
