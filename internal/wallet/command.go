@@ -95,8 +95,11 @@ func keyAccount(w *Wallet, index uint64) (protocol.Account, error) {
 // RunCommand executes the wallet CLI. Errors never include secret values.
 func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		_, e := fmt.Fprintln(out, "Usage: blwallet <create|restore|backup|password|contacts|names|outbox|accounts|export-key|send|receive|delegate|sign|submit|status|account|receivables|history|block> [flags]\nSecrets: BL_WALLET_PASSWORD / --password-file, BL_RPC_TOKEN / --token-file.\nUse blwallet <command> --help for command flags.")
+		_, e := fmt.Fprintln(out, "Usage: blwallet <create|restore|backup|password|contacts|names|outbox|request|accounts|export-key|send|receive|delegate|sign|submit|status|account|receivables|history|block> [flags]\nSecrets: BL_WALLET_PASSWORD / --password-file, BL_RPC_TOKEN / --token-file.\nUse blwallet <command> --help for command flags.")
 		return e
+	}
+	if args[0] == "request" {
+		return requestCommand(ctx, args[1:], out, errout)
 	}
 	if args[0] == "outbox" {
 		return outboxCommand(ctx, args[1:], out, errout)
