@@ -88,6 +88,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 		{"output collision", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"submit rejected", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"wait unavailable", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, false},
+		{"file acknowledged", "send", nil, true},
 		{"URI acknowledged", "send", []string{"--uri", payURI}, true},
 		{"contact acknowledged", "send", []string{"--contact", "Sender", "--amount", "1"}, true},
 		{"send acknowledged", "send", []string{"--to", string(sender), "--amount", "1"}, true},
@@ -264,6 +265,17 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 			defer server.Close()
 			args := []string{item.command, "--wallet", path, "--rpc", server.URL, "--timeout", "10s"}
 			args = append(args, item.args...)
+			if item.name == "file acknowledged" {
+				raw, err := payment.EncodeFile(payment.Request{Address: sender, Network: g.ID(), Amount: 1})
+				if err != nil {
+					t.Fatal(err)
+				}
+				file := filepath.Join(dir, "invoice.json")
+				if err := os.WriteFile(file, raw, 0644); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, "--request-file", file)
+			}
 			if item.command == "block" {
 				args = append(args, "--hash", string(source.ID()))
 			}
@@ -293,7 +305,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					t.Fatal("output failure lost signed outbox")
 				}
 			}
-			if (item.name == "contact acknowledged" || item.name == "URI acknowledged") && submitted.Link != string(sender) {
+			if (item.name == "contact acknowledged" || item.name == "URI acknowledged" || item.name == "file acknowledged") && submitted.Link != string(sender) {
 				t.Fatal("contact payment signed another destination")
 			}
 			if item.success && !json.Valid(stdout.Bytes()) {

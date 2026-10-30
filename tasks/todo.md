@@ -384,7 +384,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-040 | [x] | Request inspection validates untrusted payment URIs | Focused Go tests and race checks |
 | BL-041 | [x] | Send accepts network-pinned payment URIs | Focused Go tests and race checks |
 | BL-042 | [x] | Versioned payment request files reject unknown or oversized input | Focused Go tests and race checks |
-| BL-043 | [ ] | Send accepts validated payment request files | Focused Go tests and race checks |
+| BL-043 | [x] | Send accepts validated payment request files | Focused Go tests and race checks |
 | BL-044 | [ ] | Payment URI adversarial inputs and fuzz seeds are exercised | Seed tests and bounded fuzz campaign |
 | BL-045 | [ ] | Receive-all confirms bounded receivables sequentially | Focused Go tests and race checks |
 | BL-046 | [ ] | Receive-all resumes safely after partial failure | Focused Go tests and race checks |

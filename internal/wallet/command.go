@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"example.com/go-block-lattice/internal/client"
-	"example.com/go-block-lattice/internal/payment"
 	"example.com/go-block-lattice/internal/protocol"
 )
 
@@ -119,7 +118,7 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	fs.SetOutput(errout)
 	var f commandFlags
 	f.add(fs)
-	var seedFile, backup, address, to, amount, source, representative, kind, previous, balance, network, link, file, contact, uri string
+	var seedFile, backup, address, to, amount, source, representative, kind, previous, balance, network, link, file, contact, uri, requestFile string
 	var count, offset, limit int
 	var workBits uint
 	var wait bool
@@ -132,6 +131,7 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	case "accounts":
 		fs.IntVar(&count, "count", 1, "number of accounts (1..1000)")
 	case "send":
+		fs.StringVar(&requestFile, "request-file", "", "versioned payment request input")
 		fs.StringVar(&uri, "uri", "", "network-pinned payment request URI")
 		fs.StringVar(&contact, "contact", "", "named recipient from the private address book")
 		fs.StringVar(&to, "to", "", "destination account")
@@ -180,11 +180,11 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 	if f.timeout <= 0 {
 		return errors.New("timeout must be positive")
 	}
-	if uri != "" {
-		request, err := payment.ParseURI(uri)
-		if err != nil {
-			return err
-		}
+	request, provided, err := paymentInput(uri, requestFile)
+	if err != nil {
+		return err
+	}
+	if provided {
 		recipient, value, err := paymentDestination(&f, request, to, amount, contact)
 		if err != nil {
 			return err
