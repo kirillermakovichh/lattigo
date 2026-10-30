@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"example.com/go-block-lattice/internal/client"
+	"example.com/go-block-lattice/internal/payment"
 	"example.com/go-block-lattice/internal/protocol"
 )
 
@@ -39,6 +40,10 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 	sender := protocol.Address(senderKey.Public().(ed25519.PublicKey))
 	g := protocol.Genesis{Version: 1, Name: "online-wallet", Supply: 200, Allocations: []protocol.Allocation{{Account: a, Balance: 100, Representative: a}, {Account: sender, Balance: 100, Representative: sender}}}
 	walletBytes, err := os.ReadFile(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payURI, err := (payment.Request{Address: sender, Network: g.ID(), Amount: 1}).URI()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +88,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 		{"output collision", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"submit rejected", "send", []string{"--to", string(sender), "--amount", "1"}, false},
 		{"wait unavailable", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, false},
+		{"URI acknowledged", "send", []string{"--uri", payURI}, true},
 		{"contact acknowledged", "send", []string{"--contact", "Sender", "--amount", "1"}, true},
 		{"send acknowledged", "send", []string{"--to", string(sender), "--amount", "1"}, true},
 		{"send confirmed", "send", []string{"--to", string(sender), "--amount", "1", "--wait"}, true},
@@ -287,7 +293,7 @@ func TestOnlineWalletRejectionAndAcknowledgementBranches(t *testing.T) {
 					t.Fatal("output failure lost signed outbox")
 				}
 			}
-			if item.name == "contact acknowledged" && submitted.Link != string(sender) {
+			if (item.name == "contact acknowledged" || item.name == "URI acknowledged") && submitted.Link != string(sender) {
 				t.Fatal("contact payment signed another destination")
 			}
 			if item.success && !json.Valid(stdout.Bytes()) {
