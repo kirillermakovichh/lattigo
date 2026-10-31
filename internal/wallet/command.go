@@ -95,8 +95,11 @@ func keyAccount(w *Wallet, index uint64) (protocol.Account, error) {
 // RunCommand executes the wallet CLI. Errors never include secret values.
 func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		_, e := fmt.Fprintln(out, "Usage: blwallet <create|restore|backup|password|contacts|names|outbox|request|accounts|export-key|send|receive|delegate|sign|submit|status|account|receivables|history|block> [flags]\nSecrets: BL_WALLET_PASSWORD / --password-file, BL_RPC_TOKEN / --token-file.\nUse blwallet <command> --help for command flags.")
+		_, e := fmt.Fprintln(out, "Usage: blwallet <create|restore|backup|password|contacts|names|outbox|request|accounts|export-key|send|receive|receive-all|delegate|sign|submit|status|account|receivables|history|block> [flags]\nSecrets: BL_WALLET_PASSWORD / --password-file, BL_RPC_TOKEN / --token-file.\nUse blwallet <command> --help for command flags.")
 		return e
+	}
+	if args[0] == "receive-all" {
+		return receiveBatchCommand(ctx, args[1:], out, errout)
 	}
 	if args[0] == "request" {
 		return requestCommand(ctx, args[1:], out, errout)
@@ -369,144 +372,11 @@ func RunCommand(ctx context.Context, args []string, out, errout io.Writer) error
 		}
 		return output(out, s)
 	}
-	w, e := f.open()
-	if e != nil {
-		return e
+	result, err := createPayment(ctx, f, c, transaction{Command: command, To: to, Amount: amount, Source: source, Representative: representative, Wait: wait})
+	if err != nil {
+		return err
 	}
-	defer w.Close()
-	a, e := keyAccount(w, f.index)
-	if e != nil {
-		return e
-	}
-	// Resolve aliases so commands for the same wallet share one outbox and lock.
-	f.path, e = filepath.EvalSymlinks(f.path)
-	if e != nil {
-		return e
-	}
-	accountLock, e := lockAccount(f.path, f.index)
-	if e != nil {
-		return e
-	}
-	defer accountLock.Close() // Closing the descriptor releases Flock, including on process exit.
-	// A durable outbox prevents an uncertain prior submission from being silently replaced.
-	pending := fmt.Sprintf("%s.pending-%d.json", f.path, f.index)
-	if existing, e := loadBlock(pending); e == nil {
-		if _, e = c.Block(ctx, existing.ID()); e != nil {
-			return fmt.Errorf("unresolved signed block %s in %s: inspect or resubmit that file before creating another block", existing.ID(), pending)
-		}
-		if e = os.Remove(pending); e != nil {
-			return e
-		}
-	} else if !errors.Is(e, os.ErrNotExist) {
-		return e
-	}
-	g, e := c.Genesis(ctx)
-	if e != nil {
-		return e
-	}
-	status, e := c.Status(ctx)
-	if e != nil {
-		return e
-	}
-	if f.expectedNetwork != "" && g.ID() != protocol.Hash(f.expectedNetwork) {
-		return errors.New("RPC network differs from pinned --expected-network")
-	}
-	if status.Network != g.ID() {
-		return errors.New("RPC genesis does not match status network")
-	}
-	state, e := c.Account(ctx, a)
-	if e != nil && !(command == "receive" && client.IsNotFound(e)) {
-		return e
-	}
-	if e == nil {
-		if e = verifyAccountState(ctx, c, g, state); e != nil {
-			return e
-		}
-	}
-	b := protocol.Block{Version: 1, Network: g.ID(), Kind: command, Account: a, Previous: state.Frontier, Representative: state.Representative, Balance: state.Balance}
-	switch command {
-	case "send":
-		value, e := protocol.ParseAmount(amount)
-		if e != nil {
-			return e
-		}
-		if value == 0 || value > state.Balance {
-			return errors.New("send amount must be positive and no greater than confirmed balance")
-		}
-		if _, e = protocol.Account(to).PublicKey(); e != nil {
-			return e
-		}
-		b.Balance -= value
-		b.Link = to
-	case "delegate":
-		b.Kind = "change"
-		b.Representative = protocol.Account(representative)
-	case "receive":
-		if source == "" {
-			return errors.New("--source is required")
-		}
-		// Validate the actual source block; this also supports sources beyond one RPC page.
-		sending, e := c.Block(ctx, protocol.Hash(source))
-		if e != nil {
-			return e
-		}
-		if sending.Kind != "send" || sending.Link != string(a) || sending.Network != g.ID() {
-			return errors.New("source is not a confirmed send to this account on this network")
-		}
-		var amount protocol.Amount
-		for offset := 0; ; offset += 1000 {
-			rows, e := c.Receivables(ctx, a, offset, 1000)
-			if e != nil {
-				return e
-			}
-			for _, r := range rows {
-				if r.Source == protocol.Hash(source) {
-					amount = r.Amount
-				}
-			}
-			if amount != 0 || len(rows) < 1000 {
-				break
-			}
-			if offset >= 1_000_000 {
-				return errors.New("receivable search limit exceeded; use offline signing")
-			}
-		}
-		if amount == 0 {
-			return errors.New("source is not receivable; it may already be consumed")
-		}
-		if uint64(amount) > math.MaxUint64-uint64(state.Balance) {
-			return errors.New("receive amount overflows balance")
-		}
-		b.Balance += amount
-		b.Link = source
-		if b.Representative == "" {
-			if representative == "" {
-				b.Representative = a
-			} else {
-				b.Representative = protocol.Account(representative)
-			}
-		} else if representative != "" {
-			return errors.New("--representative is only accepted when opening an account; use delegate otherwise")
-		}
-	default:
-		return errors.New("unsupported transaction command")
-	}
-	if e = signWork(ctx, w, f.index, &b, g.WorkBits); e != nil {
-		return e
-	}
-	encoded, e := json.MarshalIndent(b, "", "  ")
-	if e != nil {
-		return e
-	}
-	if e = WritePrivate(pending, append(encoded, '\n')); e != nil {
-		return fmt.Errorf("reserve durable signed block: %w", e)
-	}
-	if f.out != "" {
-		if e = WritePrivate(f.out, append(encoded, '\n')); e != nil {
-			return fmt.Errorf("block remains in %s: %w", pending, e)
-		}
-	}
-	return submit(ctx, c, b, wait, out)
+	return output(out, result)
 }
 
 func signWork(ctx context.Context, w *Wallet, index uint64, b *protocol.Block, bits uint8) error {
@@ -565,17 +435,24 @@ func loadBlock(path string) (protocol.Block, error) {
 	return b, b.Verify()
 }
 func submit(ctx context.Context, c *client.Client, b protocol.Block, wait bool, out io.Writer) error {
+	result, err := submitResult(ctx, c, b, wait)
+	if err != nil {
+		return err
+	}
+	return output(out, result)
+}
+func submitResult(ctx context.Context, c *client.Client, b protocol.Block, wait bool) (client.Submission, error) {
 	result, e := c.Submit(ctx, b)
 	if e != nil {
-		return e
+		return result, e
 	}
 	if wait && result.Status != "confirmed" {
 		if e = c.Wait(ctx, b.ID()); e != nil {
-			return fmt.Errorf("block %s was admitted; confirmation wait ended: %w; query its hash before retry", b.ID(), e)
+			return result, fmt.Errorf("block %s was admitted; confirmation wait ended: %w; query its hash before retry", b.ID(), e)
 		}
 		result.Status = "confirmed"
 	}
-	return output(out, result)
+	return result, nil
 }
 
 // Compare RPC balance metadata with the owner's signed frontier (or explicit genesis).

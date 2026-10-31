@@ -108,7 +108,7 @@ func TestPaymentOutboxAndIdentityIOFailures(t *testing.T) {
 	pass := []byte("private fault test passphrase")
 	t.Setenv("BL_WALLET_PASSWORD", string(pass))
 	t.Setenv("BL_RPC_TOKEN", "")
-	for _, site := range []string{"command.go/RunCommand/filepath.EvalSymlinks/1", "command.go/RunCommand/os.Remove/1", "wallet.go/writeExclusive/os.Link/1", "command.go/signWork/b.GenerateWork/1", "command.go/RunCommand/json.MarshalIndent/1"} {
+	for _, site := range []string{"transaction.go/createPayment/filepath.EvalSymlinks/1", "transaction.go/createPayment/os.Remove/1", "wallet.go/writeExclusive/os.Link/1", "command.go/signWork/b.GenerateWork/1", "transaction.go/createPayment/json.MarshalIndent/1"} {
 		t.Run(site, func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, "wallet")

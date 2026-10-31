@@ -13,7 +13,7 @@ def functions(file, kind, expression):
     if file == "consensus/voting.go":
         return ["verifyProof" if expression == "p.Proof" else "acceptVote" if expression in {"e.ahead", "other.Votes"} else "drive"]
     if file == "control/control.go": return ["RunControl"]
-    if file == "wallet/command.go": return ["RunCommand"]
+    if file == "wallet/transaction.go": return ["createPayment"]
     if file == "ledger/state.go":
         return ["newState" if expression == "g.Allocations" else "weights" if expression == "s.accounts" else "representativeCapacity" if expression == "weights" else "validate"]
     if file == "ledger/types.go": return ["certificate"]
@@ -63,7 +63,7 @@ exclude("ledger/state.go", "switch", "b.Kind", ["default"],
         "Block.Verify rejects unknown kinds before transition dispatch")
 exclude("control/control.go", "switch", "cmd", ["default"],
         "the first command switch rejects unknown commands; cmd is never reassigned")
-exclude("wallet/command.go", "switch", "command", ["default"],
+exclude("wallet/transaction.go", "switch", "command", ["default"],
         "the flag switch rejects unknown commands and all non-payment commands return before payment dispatch")
 for expression in ("[]*string{&cfg.DataDir, &cfg.Genesis, &cfg.RepresentativeKey}",
                    "[]string{c.RPCListen, c.P2PListen}"):
