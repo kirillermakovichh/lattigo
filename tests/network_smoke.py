@@ -198,13 +198,15 @@ def scenario(network):
         network.start(i)
     network.converge(range(4), 0)
     common = ["--rpc", network.origins[0], "--expected-network", genesis["network"], "--wait", "--timeout", "50s"]
-    sent = network.wallet("rep-0", "send", "--to", destination, "--amount", "25", *common)
+    request = network.wallet("recipient", "request", "--network", genesis["network"], "--amount", "25")
+    sent = network.wallet("rep-0", "send", "--uri", request["uri"], *common)
     assert sent["status"] == "confirmed", sent
     network.converge(range(4), 1)
     received = network.wallet(
-        "recipient", "receive", "--source", sent["hash"], "--representative", accounts[0], *common,
+        "recipient", "receive-all", "--limit", "1", "--representative", accounts[0],
+        "--rpc", network.origins[0], "--expected-network", genesis["network"], "--timeout", "50s",
     )
-    assert received["status"] == "confirmed", received
+    assert len(received["completed"]) == 1 and received["completed"][0]["status"] == "confirmed", received
     delegated = network.wallet("recipient", "delegate", "--representative", accounts[1], *common)
     assert delegated["status"] == "confirmed", delegated
     network.converge(range(4), 3)
@@ -220,7 +222,10 @@ def scenario(network):
     rpc(network.origins[0], "/v1/blocks", body={}, expected=401)
     # Three live representatives still hold more than two thirds after delegation.
     network.stop(3)
-    second = network.wallet("rep-0", "send", "--to", destination, "--amount", "5", *common)
+    invoice = network.path / "payment-request.json"
+    network.wallet("recipient", "request", "--network", genesis["network"], "--amount", "5",
+                   "--format", "json", "--out", invoice)
+    second = network.wallet("rep-0", "send", "--request-file", invoice, *common)
     assert second["status"] == "confirmed", second
     network.converge(range(3), 4)
     network.start(3)
@@ -248,7 +253,7 @@ def scenario(network):
     print(json.dumps({"status": "passed", "representatives": 4, "restored_observers": 1,
                       "confirmed_height": final["height"], "recipient_balance": account["balance"],
                       "scenarios": ["send", "receive", "delegate", "idempotent_retry", "unauthorized_write",
-                                    "quorum_with_one_offline", "restart_catchup", "backup", "observer_restore"]}))
+                                    "quorum_with_one_offline", "restart_catchup", "backup", "observer_restore", "payment_uri", "request_file", "receive_all"]}))
 
 
 def main():
@@ -261,6 +266,7 @@ def main():
             binary_dir.mkdir()
             env = os.environ.copy()
             env.setdefault("GOCACHE", str(ROOT / ".cache/go-build"))
+            env.setdefault("GOMODCACHE", str(ROOT / ".cache/go-mod"))
             for binary in ("blnode", "blwallet", "blctl"):
                 subprocess.run(["go", "build", "-o", str(binary_dir / binary), "./cmd/" + binary],
                                cwd=ROOT, env=env, check=True, timeout=90)

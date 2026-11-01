@@ -1,7 +1,8 @@
 # Session handoff
 
-The authorized product extension plan is tracked only in tasks/todo.md (BL-024..BL-119).
-Wallet extensions BL-024..BL-037 are complete; focused race checks, make check and the
-owned wallet CLI process workflow pass. Next: payment request and batch-receive features.
-Preserve local meaningful commits toward the authorized total of208. No verification
-reports, remote actions or public deployment. Public-release tasks BL-020/BL-021 remain open.
+Authorized extensions are tracked only in tasks/todo.md (BL-024..BL-119).
+Wallet and payment extensions BL-024..BL-047 are complete. Focused tests, race checks,
+wallet CLI workflow and the extended four-representative/observer process scenario pass.
+Next: RPC cursor views, bounded batch reads, confirmation waits and public Go client.
+Preserve meaningful local commits toward208. No verification reports or remote actions.
+Public-release tasks BL-020/BL-021 remain open.

@@ -388,7 +388,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-044 | [x] | Payment URI adversarial inputs and fuzz seeds are exercised | Seed tests and bounded fuzz campaign |
 | BL-045 | [x] | Receive-all confirms bounded receivables sequentially | Focused Go tests and race checks |
 | BL-046 | [x] | Receive-all resumes safely after partial failure | Focused Go tests and race checks |
-| BL-047 | [ ] | Real process payments exercise request and receive-all commands | Owned process scenario and cleanup checks |
+| BL-047 | [x] | Real process payments exercise request and receive-all commands | Owned process scenario and cleanup checks |
 
 ### RPC
 

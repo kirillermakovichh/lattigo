@@ -203,3 +203,26 @@ raw-unit integer; network is the explicit genesis hash. Repeated or unknown fiel
 authorities, fragments, control characters and inputs above2048 bytes are rejected.
 Formatting sorts and escapes query fields deterministically. Labels and messages are
 request metadata and do not become fields of signed blocks or ledger history.
+
+
+Create a request with `blwallet request --address ADDRESS --network HASH --amount RAW`.
+Without `--address`, the selected local wallet account supplies the recipient.
+`--label` and `--message` add bounded off-chain metadata. Inspect a URI with
+`request --action inspect --uri URI`; inspection cannot override its fields.
+`--format json --out FILE` writes a version1 request object containing `version`,
+`address`, `network`, `amount` and optional `label`/`message`. Files are at most8KiB;
+duplicate keys, unknown fields, null values and unsupported versions are rejected.
+Default `--format uri --out FILE` saves the canonical URI as a private text file.
+
+Use `send --uri URI` or `send --request-file FILE` to pay a request. Sources are mutually
+exclusive and cannot be combined with `--to`, `--amount` or `--contact`. The request
+network must agree with any explicit pin and with the queried node before signing.
+Public regular request files need not contain secrets or require owner-only permissions.
+
+`receive-all --wallet PATH --limit N` receives up toN transfers (default20, maximum100),
+waiting for each confirmation before creating the next block. Its overall `--timeout`
+bounds the batch. `--representative` applies only to the first opening receive.
+The JSON result contains confirmed `completed` receipts and, after uncertain submission,
+`pending` intent plus an error; a partial failure exits unsuccessfully. Retry that exact
+outbox before continuing. `limit_reached` means the batch processed its configured
+count, not a claim that more receivables exist. An empty list succeeds without signing.
