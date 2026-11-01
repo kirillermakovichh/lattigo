@@ -2,6 +2,7 @@
 package rpc
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -33,6 +34,7 @@ type Config struct {
 }
 
 type Server struct {
+	cursors    cursorCodec
 	cfg        Config
 	slots      chan struct{}
 	backupSlot chan struct{}
@@ -44,7 +46,11 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Store == nil || cfg.Engine == nil {
 		return nil, errors.New("RPC requires ledger and consensus engine")
 	}
-	return &Server{cfg: cfg, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1)}, nil
+	var key cursorCodec
+	if _, err := rand.Read(key[:]); err != nil {
+		return nil, err
+	}
+	return &Server{cfg: cfg, cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1)}, nil
 }
 
 func (s *Server) Handler() http.Handler {
