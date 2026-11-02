@@ -38,6 +38,7 @@ type Server struct {
 	cfg        Config
 	slots      chan struct{}
 	backupSlot chan struct{}
+	waitSlots  chan struct{}
 	requests   atomic.Uint64
 	rejected   atomic.Uint64
 }
@@ -50,7 +51,7 @@ func New(cfg Config) (*Server, error) {
 	if _, err := rand.Read(key[:]); err != nil {
 		return nil, err
 	}
-	return &Server{cfg: cfg, cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1)}, nil
+	return &Server{cfg: cfg, cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1), waitSlots: make(chan struct{}, 8)}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -63,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/history", s.history)
 	mux.HandleFunc("GET /v1/history/page", s.historyPage)
 	mux.HandleFunc("GET /v1/block", s.block)
+	mux.HandleFunc("GET /v1/confirmation", s.confirmation)
 	mux.HandleFunc("POST /v1/blocks", s.submit)
 	mux.HandleFunc("POST /v1/query", s.batchRead)
 	mux.HandleFunc("GET /v1/admin/backup", s.backup)
