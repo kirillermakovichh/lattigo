@@ -97,3 +97,25 @@ func (s *Server) historyPage(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, response)
 }
+
+func (s *Server) receivablePage(w http.ResponseWriter, r *http.Request) {
+	scope, err := s.pageScope(r, "receivables")
+	if err != nil {
+		writeError(w, 400, "invalid_cursor", errCursor.Error())
+		return
+	}
+	view, err := s.cfg.Store.ReceivableView(scope.Account, scope.Anchor, scope.After, scope.Limit)
+	if err != nil {
+		pageError(w, err)
+		return
+	}
+	response := pageEnvelope[ledger.Receivable]{Items: view.Items, Anchor: view.Anchor}
+	if view.More {
+		response.Next, err = s.nextCursor("receivables", scope, view.Anchor, 0, view.After)
+		if err != nil {
+			pageError(w, err)
+			return
+		}
+	}
+	writeJSON(w, 200, response)
+}

@@ -59,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/genesis", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, s.cfg.Store.Genesis()) })
 	mux.HandleFunc("GET /v1/account", s.account)
 	mux.HandleFunc("GET /v1/receivables", s.receivables)
+	mux.HandleFunc("GET /v1/receivables/page", s.receivablePage)
 	mux.HandleFunc("GET /v1/history", s.history)
 	mux.HandleFunc("GET /v1/history/page", s.historyPage)
 	mux.HandleFunc("GET /v1/block", s.block)
