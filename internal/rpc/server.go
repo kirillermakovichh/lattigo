@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/account", s.account)
 	mux.HandleFunc("GET /v1/receivables", s.receivables)
 	mux.HandleFunc("GET /v1/history", s.history)
+	mux.HandleFunc("GET /v1/history/page", s.historyPage)
 	mux.HandleFunc("GET /v1/block", s.block)
 	mux.HandleFunc("POST /v1/blocks", s.submit)
 	mux.HandleFunc("GET /v1/admin/backup", s.backup)

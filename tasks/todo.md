@@ -396,7 +396,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | --- | --- | --- | --- |
 | BL-048 | [x] | Cursor tokens bind canonical page scope and network | Focused Go tests and race checks |
 | BL-049 | [x] | Ledger page reads capture one consistent confirmed view | Focused Go tests and race checks |
-| BL-050 | [ ] | History page endpoint supports stable continuation | Focused Go tests and race checks |
+| BL-050 | [x] | History page endpoint supports stable continuation | Focused Go tests and race checks |
 | BL-051 | [ ] | Receivables page endpoint detects stale continuation | Focused Go tests and race checks |
 | BL-052 | [ ] | Client exposes typed cursor page operations | Focused Go tests and race checks |
 | BL-053 | [ ] | Cursor misuse and stale snapshot responses are verified | Focused Go tests and race checks |
