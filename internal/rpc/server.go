@@ -64,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/history/page", s.historyPage)
 	mux.HandleFunc("GET /v1/block", s.block)
 	mux.HandleFunc("POST /v1/blocks", s.submit)
+	mux.HandleFunc("POST /v1/query", s.batchRead)
 	mux.HandleFunc("GET /v1/admin/backup", s.backup)
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"live": true})
