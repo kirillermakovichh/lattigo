@@ -401,7 +401,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-052 | [x] | Client exposes typed cursor page operations | Focused Go tests and race checks |
 | BL-053 | [x] | Cursor misuse and stale snapshot responses are verified | Focused Go tests and race checks |
 | BL-054 | [x] | Bounded batch reads return independent typed outcomes | Focused Go tests and race checks |
-| BL-055 | [ ] | Client batches account block and status reads | Focused Go tests and race checks |
+| BL-055 | [x] | Client batches account block and status reads | Focused Go tests and race checks |
 | BL-056 | [ ] | Confirmation wait endpoint has bounded deadlines | Focused Go tests and race checks |
 | BL-057 | [ ] | Client exposes server-assisted confirmation waits | Focused Go tests and race checks |
 | BL-058 | [ ] | Confirmation waits cancel without retaining handlers | Focused Go tests and race checks |
