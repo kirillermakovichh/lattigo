@@ -447,7 +447,7 @@ func submitResult(ctx context.Context, c *client.Client, b protocol.Block, wait 
 		return result, e
 	}
 	if wait && result.Status != "confirmed" {
-		if e = c.Wait(ctx, b.ID()); e != nil {
+		if e = c.WaitConfirmed(ctx, b.ID()); e != nil {
 			return result, fmt.Errorf("block %s was admitted; confirmation wait ended: %w; query its hash before retry", b.ID(), e)
 		}
 		result.Status = "confirmed"
