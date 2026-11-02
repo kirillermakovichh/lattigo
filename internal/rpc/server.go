@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,8 @@ type Config struct {
 }
 
 type Server struct {
+	stopping   chan struct{}
+	stopOnce   sync.Once
 	cursors    cursorCodec
 	cfg        Config
 	slots      chan struct{}
@@ -51,8 +54,11 @@ func New(cfg Config) (*Server, error) {
 	if _, err := rand.Read(key[:]); err != nil {
 		return nil, err
 	}
-	return &Server{cfg: cfg, cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1), waitSlots: make(chan struct{}, 8)}, nil
+	return &Server{cfg: cfg, stopping: make(chan struct{}), cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1), waitSlots: make(chan struct{}, 8)}, nil
 }
+
+// Stop releases long-lived readers without closing shared ledger state.
+func (s *Server) Stop() { s.stopOnce.Do(func() { close(s.stopping) }) }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()

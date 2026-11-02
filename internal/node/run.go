@@ -102,6 +102,7 @@ func Run(ctx context.Context, cfg Config) error {
 	// Stop listeners first. HTTP handlers may finish accepted durable operations before
 	// consensus/network workers are canceled and the ledger is released.
 	handlers.stop()
+	api.Stop()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	var shutdown sync.WaitGroup
 	var shutdownMu sync.Mutex

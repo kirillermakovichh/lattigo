@@ -78,6 +78,11 @@ func (s *Server) confirmation(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 	for {
 		select {
+		case <-s.stopping:
+			if !s.writeConfirmed(w, id) {
+				writeJSON(w, 200, confirmationResult{Hash: id})
+			}
+			return
 		case <-r.Context().Done():
 			return
 		case <-deadline.C:
