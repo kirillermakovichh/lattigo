@@ -74,9 +74,16 @@ func (s *Server) confirmation(w http.ResponseWriter, r *http.Request) {
 	}
 	deadline := time.NewTimer(time.Duration(wait) * time.Millisecond)
 	defer deadline.Stop()
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
 	for {
+		b, changed, err := s.cfg.Store.ObserveConfirmation(id)
+		if err == nil {
+			writeJSON(w, 200, confirmationResult{Hash: id, Confirmed: true, Block: &b})
+			return
+		}
+		if !errors.Is(err, ledger.ErrNotFound) {
+			classify(w, err)
+			return
+		}
 		select {
 		case <-s.stopping:
 			if !s.writeConfirmed(w, id) {
@@ -90,10 +97,7 @@ func (s *Server) confirmation(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, 200, confirmationResult{Hash: id})
 			}
 			return
-		case <-ticker.C:
-			if s.writeConfirmed(w, id) {
-				return
-			}
+		case <-changed:
 		}
 	}
 }

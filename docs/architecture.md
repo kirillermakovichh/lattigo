@@ -24,6 +24,10 @@ Ledger is the sole authority for atomic confirmed transitions. Consensus consume
 consistent confirmed view and submits certified records. P2P/RPC never mutate indexes.
 The engine serializes commands and voting state with a mutex. Storage serializes durable
 updates with its own lock. Transport callbacks run after the engine mutex is released.
+Ledger observations atomically capture a confirmed read and a change channel under the
+store lock. Only a newly fsynced and applied record rotates that channel; retries and
+failed writes do not publish confirmation. Close wakes readers, which re-read state
+and observe closure. Readers retain no per-subscriber queues or ledger-owned goroutines.
 Network I/O is outside ledger transitions. The node owns worker and listener lifetimes.
 
 At each global confirmation height, weights come from the preceding confirmed state.

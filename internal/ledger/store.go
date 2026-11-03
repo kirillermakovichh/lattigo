@@ -38,6 +38,7 @@ type Store struct {
 	closed       bool
 	failed       error
 	observerOnly bool
+	changed      chan struct{}
 }
 
 func Open(directory string, g protocol.Genesis) (*Store, error) {
@@ -81,7 +82,7 @@ func open(directory string, g protocol.Genesis, strict bool, options Options) (*
 	if e != nil {
 		return nil, e
 	}
-	s := &Store{state: newState(g), historyLimit: options.MaxHistoryBytes}
+	s := &Store{state: newState(g), historyLimit: options.MaxHistoryBytes, changed: make(chan struct{})}
 	if _, err := os.Stat(filepath.Join(directory, "RESTORED")); err == nil {
 		s.observerOnly = true
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -119,6 +120,7 @@ func (s *Store) Close() error {
 		return nil
 	}
 	s.closed = true
+	close(s.changed)
 	return s.journal.Close()
 }
 func (s *Store) Genesis() protocol.Genesis {
@@ -313,6 +315,8 @@ func (s *Store) Commit(r Record) error {
 	}
 	s.state.apply(r, len(p))
 	s.historyBytes += uint64(len(p))
+	close(s.changed)
+	s.changed = make(chan struct{})
 	return nil
 }
 func (s *Store) SaveSigningState(b []byte) error {
