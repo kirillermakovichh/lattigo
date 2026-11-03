@@ -31,10 +31,10 @@ def main():
     if hits.exists():
         shutil.rmtree(hits)
     hits.mkdir()
-    env = dict(os.environ, GOCACHE=str(ROOT / ".cache/go-build"), BL_BRANCH_OUT=str(hits))
+    env = dict(os.environ, GOCACHE=str(ROOT / ".cache/go-build"), GOMODCACHE=str(ROOT / ".cache/go-mod"), BL_BRANCH_OUT=str(hits))
     with tempfile.TemporaryDirectory(prefix="bl-decisions-") as temporary:
         copy = Path(temporary)
-        for name in ("internal", "cmd", "testdata", "tests"):
+        for name in ("internal", "cmd", "testdata", "tests", "client"):
             shutil.copytree(ROOT / name, copy / name)
         shutil.copy2(ROOT / "go.mod", copy / "go.mod")
         inventory = out / "inventory.json"

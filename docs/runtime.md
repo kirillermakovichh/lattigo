@@ -50,6 +50,10 @@ Success responses are raw JSON objects or arrays. Errors have the shape
 | GET /v1/account?address= | Confirmed account state; 404/not_found if unopened |
 | GET /v1/receivables?address=&offset=&limit= | Deterministically ordered receivable transfers |
 | GET /v1/history?address=&offset=&limit= | Confirmed account records |
+| GET /v1/history/page?address=&limit=&cursor= | Anchored history with authenticated continuation |
+| GET /v1/receivables/page?address=&limit=&cursor= | Snapshot-bound receivables with continuation |
+| POST /v1/query | Up to32 independent status/account/block reads |
+| GET /v1/confirmation?id=&wait_ms= | Confirmed block lookup or bounded wait |
 | GET /v1/block?id= | A confirmed block |
 | POST /v1/blocks | Admit a signed block; returns hash and status |
 | GET /v1/admin/backup | A consistent binary ledger backup |
@@ -120,3 +124,41 @@ headroom under saturating input and maximum-size certificates. This is an engine
 recommendation from configured bounds, not a measured throughput or memory guarantee.
 Increasing peer count or retained history raises the required memory budget.
 Monitor retained-history bytes, queue bytes and rejected requests under your workload.
+
+
+## Cursor views, read batches and confirmation waits
+
+Page responses contain `items`, `anchor` (`height`, `tip`) and optional `next`.
+Continue using the same account and returned cursor. Page size defaults to100 and is
+1..1000; it cannot change within a continuation. Tokens are at most1024 bytes and
+bind account, network, route, limit and snapshot with HMAC-SHA256 under an ephemeral
+server key. Restarting or changing nodes invalidates the token; restart pagination.
+History remains anchored when later records arrive. Any confirmation changes a
+receivable snapshot; its next request returns HTTP409/`stale_cursor` instead of a
+shifted page. Malformed/tampered scopes return HTTP400/`invalid_cursor`.
+
+Read batches use `{"queries":[{"id":"sender","operation":"account","address":"ADDRESS"}]}`.
+Operations are `status`, `account` and `block` (with `hash`). Each of1..32 unique bounded
+string IDs receives an ordered result containing exactly one `data` or `error`.
+Queries are read-only and independent, not an atomic multi-query snapshot. Global
+input remains1MiB; the query count is bounded during decoding. Unknown operations and
+missing confirmed records produce per-query errors without hiding other results.
+
+Confirmation lookup returns `hash`, `confirmed` and, only when true, a signed `block`.
+False says only that confirmation was not observed; it does not assert admission.
+`wait_ms` is0..15000 (default0). At most8 long waits coexist; excess waits return503.
+Client cancellation and node shutdown release waiting handlers immediately. Known
+confirmed blocks can still be looked up when long-wait capacity is exhausted.
+
+## Go client
+
+The importable package `example.com/go-block-lattice/client` exposes exact protocol
+amounts, accounts, blocks, typed pages, batches and confirmation methods. Until a real
+module destination is chosen, local applications can use a go.mod `replace` directive.
+`NewWithOptions` accepts `WithTimeout` (positive, at most10m), `WithTransport` and
+`WithUserAgent`. Redirects stay disabled. `CloseIdleConnections` releases idle sockets.
+`Batch` validates result order and known response types; `ReadResult.Decode` returns
+per-query errors directly. `WaitConfirmed` long-polls and falls back to block lookup
+for older nodes lacking the additive route. Contexts remain owned by the caller.
+The client checks block signatures and identity; it trusts the RPC node for finality
+and does not implement independent certificate-verifying light-client consensus.

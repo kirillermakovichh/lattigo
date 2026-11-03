@@ -192,6 +192,32 @@ func Flush(){if directory==""{return};mu.Lock();defer mu.Unlock();f,err:=os.Crea
 func Exit(code int){Flush();os.Exit(code)}
 `
 
+func addTestMain(dir string) error {
+	files, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return nil
+	}
+	var packageName string
+	for _, path := range files {
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.PackageClauseOnly)
+		if err != nil {
+			return err
+		}
+		if packageName == "" {
+			packageName = file.Name.Name
+		}
+		if !strings.HasSuffix(file.Name.Name, "_test") {
+			packageName = file.Name.Name
+			break
+		}
+	}
+	content := fmt.Sprintf("package %s\nimport(\"os\";\"testing\";_branchProbe \"example.com/go-block-lattice/internal/branchprobe\")\nfunc TestMain(m *testing.M){code:=m.Run();_branchProbe.Flush();os.Exit(code)}\n", packageName)
+	return os.WriteFile(filepath.Join(dir, "branch_probe_test.go"), []byte(content), 0600)
+}
+
 func main() {
 	if len(os.Args) != 3 {
 		panic("usage: instrument COPY INVENTORY")
@@ -210,7 +236,10 @@ func main() {
 	if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
 		panic("refusing to instrument a Git checkout")
 	}
-	for _, base := range []string{"internal", "cmd"} {
+	for _, base := range []string{"internal", "cmd", "client"} {
+		if _, err := os.Stat(filepath.Join(root, base)); os.IsNotExist(err) {
+			continue
+		}
 		err = filepath.WalkDir(filepath.Join(root, base), func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -244,32 +273,14 @@ func main() {
 			if !entry.IsDir() || entry.Name() == "branchprobe" {
 				continue
 			}
-			dir := filepath.Join(root, base, entry.Name())
-			files, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
-			if err != nil {
+			if err := addTestMain(filepath.Join(root, base, entry.Name())); err != nil {
 				panic(err)
 			}
-			if len(files) == 0 {
-				continue
-			}
-			var packageName string
-			for _, path := range files {
-				f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.PackageClauseOnly)
-				if err != nil {
-					panic(err)
-				}
-				if !strings.HasSuffix(f.Name.Name, "_test") {
-					packageName = f.Name.Name
-					break
-				}
-			}
-			if packageName == "" {
-				continue
-			}
-			content := fmt.Sprintf("package %s\nimport(\"os\";\"testing\";_branchProbe \"example.com/go-block-lattice/internal/branchprobe\")\nfunc TestMain(m *testing.M){code:=m.Run();_branchProbe.Flush();os.Exit(code)}\n", packageName)
-			if err = os.WriteFile(filepath.Join(dir, "branch_probe_test.go"), []byte(content), 0600); err != nil {
-				panic(err)
-			}
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "client")); err == nil {
+		if err := addTestMain(filepath.Join(root, "client")); err != nil {
+			panic(err)
 		}
 	}
 	data, err := json.MarshalIndent(sites, "", "  ")

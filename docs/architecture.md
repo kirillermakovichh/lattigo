@@ -13,6 +13,7 @@ local wallet and operator CLI. Spending keys never need to enter the node.
 | internal/rpc | Versioned HTTP contracts, bearer authorization, readiness, metrics and staged backup |
 | internal/node | Strict config, construction, listener ownership and joined shutdown |
 | internal/wallet | Encrypted custody, deterministic keys, offline/online signing and durable outbox |
+| client | Public Go HTTP client and protocol aliases without duplicated transport logic |
 | internal/client | Bounded RPC client, origin/redirect policy and uncertain submission outcomes |
 | internal/control | Genesis/configuration generation, backup, offline verification and restore |
 | cmd/ | blnode, blwallet and blctl entrypoints |

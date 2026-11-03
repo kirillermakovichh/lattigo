@@ -405,7 +405,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-056 | [x] | Confirmation wait endpoint has bounded deadlines | Focused Go tests and race checks |
 | BL-057 | [x] | Client exposes server-assisted confirmation waits | Focused Go tests and race checks |
 | BL-058 | [x] | Confirmation waits cancel without retaining handlers | Focused Go tests and race checks |
-| BL-059 | [ ] | Public Go client exposes reusable payment interfaces | Focused Go tests and race checks |
+| BL-059 | [x] | Public Go client exposes reusable payment interfaces | Focused Go tests and race checks |
 
 ### Events
 

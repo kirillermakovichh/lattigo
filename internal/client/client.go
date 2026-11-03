@@ -22,6 +22,7 @@ const MaxResponseBytes = 32 << 20
 type Client struct {
 	base  string
 	token string
+	agent string
 	http  *http.Client
 }
 type Error struct {
@@ -74,7 +75,9 @@ type Submission struct {
 	Status string        `json:"status"`
 }
 
-func New(endpoint, token string) (*Client, error) {
+func New(endpoint, token string) (*Client, error) { return NewWithOptions(endpoint, token) }
+
+func NewWithOptions(endpoint, token string, options ...Option) (*Client, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err
@@ -82,7 +85,16 @@ func New(endpoint, token string) (*Client, error) {
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.Trim(u.Path, "/") != "" {
 		return nil, errors.New("RPC endpoint must be an http(s) origin without credentials, path, query or fragment")
 	}
-	return &Client{base: strings.TrimRight(endpoint, "/"), token: token, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("RPC redirects are disabled") }}}, nil
+	cfg := clientOptions{timeout: 30 * time.Second, agent: "GoBlockLattice/1"}
+	for _, option := range options {
+		if option == nil {
+			return nil, errors.New("nil client option")
+		}
+		if err := option(&cfg); err != nil {
+			return nil, err
+		}
+	}
+	return &Client{base: strings.TrimRight(endpoint, "/"), token: token, agent: cfg.agent, http: &http.Client{Timeout: cfg.timeout, Transport: cfg.transport, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("RPC redirects are disabled") }}}, nil
 }
 func (c *Client) request(ctx context.Context, method, path string, body any, out any) error {
 	var reader io.Reader
@@ -98,6 +110,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.agent)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -225,6 +238,7 @@ func (c *Client) Backup(ctx context.Context, dst io.Writer, maxBytes int64) erro
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("User-Agent", c.agent)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err

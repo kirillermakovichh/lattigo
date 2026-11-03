@@ -12,7 +12,8 @@ This is an independent protocol, not a Nano-compatible node.
 - Weighted prevote/precommit confirmation, proposer rotation, durable locks and round recovery.
 - Checksummed fsynced ledger, exclusive locking, certified replay and observer-only backup restore.
 - Bounded peer gossip, verified catchup, authenticated payment RPC, readiness and metrics.
-- Local encrypted wallets, deterministic accounts, offline signing and durable submission outbox.
+- Local encrypted wallets, password rotation, named accounts, network-pinned contacts and durable outbox.
+- Payment URIs/request files, sequential receive-all, cursor RPC pages, read batches and public Go client.
 - Node/wallet/operator CLIs, generated private-network manifests and reproducible binary archives.
 
 ## Build and run

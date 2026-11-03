@@ -50,6 +50,10 @@ class BranchInstrumentation(unittest.TestCase):
   if Sum(nil)!=0 || Sum([][]int{{1,-1},nil,{0}})!=1{t.Fatal("labeled range")}
  }
 ''')
+            public = copy / "client"
+            public.mkdir()
+            (public / "public.go").write_text("package client\nfunc Good(flag bool)bool{if flag{return true};return false}\n")
+            (public / "public_test.go").write_text('package client_test\nimport("testing";c "example.com/go-block-lattice/client")\nfunc TestPublic(t *testing.T){if !c.Good(true)||c.Good(false){t.Fatal("public semantics")}}\n')
             inventory = Path(temporary) / "inventory.json"
             hits = Path(temporary) / "hits"
             hits.mkdir()
@@ -63,7 +67,7 @@ class BranchInstrumentation(unittest.TestCase):
             for path in hits.glob("*.json"):
                 observed.update(json.loads(path.read_text()))
             for site in json.loads(inventory.read_text()):
-                self.assertIn(site["function"], {"Decide", "Sum"})
+                self.assertIn(site["function"], {"Decide", "Sum", "Good"})
                 for outcome in site["outcomes"]:
                     self.assertGreater(observed.get(site["id"], {}).get(outcome, 0), 0,
                                        (site["expression"], outcome))

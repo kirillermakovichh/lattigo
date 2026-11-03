@@ -1,4 +1,5 @@
 export GOCACHE := $(CURDIR)/.cache/go-build
+export GOMODCACHE := $(CURDIR)/.cache/go-mod
 
 .PHONY: check build docs-check
 check: docs-check
