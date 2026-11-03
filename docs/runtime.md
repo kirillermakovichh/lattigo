@@ -162,3 +162,11 @@ per-query errors directly. `WaitConfirmed` long-polls and falls back to block lo
 for older nodes lacking the additive route. Contexts remain owned by the caller.
 The client checks block signatures and identity; it trusts the RPC node for finality
 and does not implement independent certificate-verifying light-client consensus.
+
+## Confirmed event stream
+
+`GET /v1/events` streams durable certified records as SSE `confirmed` events,
+replaying from genesis. At most eight event subscribers share the normal RPC
+concurrency budget. Each subscriber reads one copied record at a time without
+a queue. Disconnect and server shutdown release admission. Writes have a five
+second deadline and idle streams send a heartbeat every15 seconds.

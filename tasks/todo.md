@@ -412,7 +412,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
 | BL-060 | [x] | Ledger signals only durable confirmed state changes | Focused Go tests and race checks |
-| BL-061 | [ ] | SSE streams confirmed records with bounded admission | Focused Go tests and race checks |
+| BL-061 | [x] | SSE streams confirmed records with bounded admission | Focused Go tests and race checks |
 | BL-062 | [ ] | SSE replay validates network-bound event identifiers | Focused Go tests and race checks |
 | BL-063 | [ ] | Streams bound heartbeat writes and subscriber resources | Focused Go tests and race checks |
 | BL-064 | [ ] | Client parses bounded SSE frames and cancellation | Focused Go tests and race checks |
