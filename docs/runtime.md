@@ -175,3 +175,9 @@ Event IDs are canonical `NETWORK_HASH:HEIGHT` positions. `Last-Event-ID` resumes
 after the last delivered height. Unknown networks/noncanonical IDs return400;
 a position ahead of the node returns409 `event_ahead`, allowing retry after catchup.
 IDs survive restarts because they refer to durable ledger heights.
+
+The public Go client exposes `Events(ctx, EventOptions, callback)`. Options require
+a pinned network and optional resume ID. Parsing bounds every complete or partial
+frame to16MiB plus1KiB and verifies block signatures, network, height and ordering.
+The returned ID advances only after the callback succeeds; incomplete frames and
+consumer failures remain unacknowledged. Confirmation still trusts the chosen node.

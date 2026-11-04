@@ -19,6 +19,8 @@ type Status = transport.Status
 type AccountState = transport.AccountState
 type Receivable = transport.Receivable
 type Submission = transport.Submission
+type Event = transport.Event
+type EventOptions = transport.EventOptions
 type Confirmation = transport.Confirmation
 type Anchor = transport.Anchor
 type Page[T any] = transport.Page[T]
@@ -53,3 +55,5 @@ func IsNotFound(err error) bool              { return transport.IsNotFound(err) 
 func ParseAmount(raw string) (Amount, error) { return protocol.ParseAmount(raw) }
 func Address(key ed25519.PublicKey) Account  { return protocol.Address(key) }
 func Digest(raw []byte) Hash                 { return protocol.Digest(raw) }
+
+var ErrEventProtocol = transport.ErrEventProtocol
