@@ -13,6 +13,20 @@ import (
 
 const eventWriteTimeout = 5 * time.Second
 const eventHeartbeat = 15 * time.Second
+const maxEventData = 16 << 20
+
+func writeEvent(w http.ResponseWriter, controller *http.ResponseController, id string, data []byte) error {
+	if len(data) > maxEventData {
+		return errors.New("event exceeds frame budget")
+	}
+	if err := controller.SetWriteDeadline(time.Now().Add(eventWriteTimeout)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "id: %s\nevent: confirmed\ndata: %s\n\n", id, data); err != nil {
+		return err
+	}
+	return controller.Flush()
+}
 
 // events tails durable records directly, without retaining subscriber queues.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -67,13 +81,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return
 			}
-			if err := controller.SetWriteDeadline(time.Now().Add(eventWriteTimeout)); err != nil {
-				return
-			}
-			if _, err := fmt.Fprintf(w, "id: %s\nevent: confirmed\ndata: %s\n\n", event.ID(network, record.Height), data); err != nil {
-				return
-			}
-			if err := controller.Flush(); err != nil {
+			if err := writeEvent(w, controller, event.ID(network, record.Height), data); err != nil {
 				return
 			}
 			after = record.Height
