@@ -170,3 +170,8 @@ replaying from genesis. At most eight event subscribers share the normal RPC
 concurrency budget. Each subscriber reads one copied record at a time without
 a queue. Disconnect and server shutdown release admission. Writes have a five
 second deadline and idle streams send a heartbeat every15 seconds.
+
+Event IDs are canonical `NETWORK_HASH:HEIGHT` positions. `Last-Event-ID` resumes
+after the last delivered height. Unknown networks/noncanonical IDs return400;
+a position ahead of the node returns409 `event_ahead`, allowing retry after catchup.
+IDs survive restarts because they refer to durable ledger heights.

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"example.com/go-block-lattice/internal/event"
 	"example.com/go-block-lattice/internal/ledger"
 )
 
@@ -17,6 +18,27 @@ const eventHeartbeat = 15 * time.Second
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" {
 		writeError(w, 400, "invalid_events", "event query fields are unsupported")
+		return
+	}
+	network := s.cfg.Store.Status().Network
+	after := uint64(0)
+	if values := r.Header.Values("Last-Event-ID"); len(values) > 1 {
+		writeError(w, 400, "invalid_event_id", "multiple event identifiers")
+		return
+	}
+	if value := r.Header.Get("Last-Event-ID"); value != "" {
+		var err error
+		after, err = event.ParseID(value, network)
+		if err != nil {
+			writeError(w, 400, "invalid_event_id", err.Error())
+			return
+		}
+	}
+	if _, _, err := s.cfg.Store.ObserveRecord(after); errors.Is(err, ledger.ErrStaleView) {
+		writeError(w, 409, "event_ahead", "event height is ahead of this node")
+		return
+	} else if err != nil && !errors.Is(err, ledger.ErrNotFound) {
+		classify(w, err)
 		return
 	}
 	select {
@@ -38,7 +60,6 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	heartbeat := time.NewTicker(eventHeartbeat)
 	defer heartbeat.Stop()
-	after := uint64(0)
 	for {
 		record, changed, err := s.cfg.Store.ObserveRecord(after)
 		if err == nil {
@@ -49,7 +70,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			if err := controller.SetWriteDeadline(time.Now().Add(eventWriteTimeout)); err != nil {
 				return
 			}
-			if _, err := fmt.Fprintf(w, "event: confirmed\ndata: %s\n\n", data); err != nil {
+			if _, err := fmt.Fprintf(w, "id: %s\nevent: confirmed\ndata: %s\n\n", event.ID(network, record.Height), data); err != nil {
 				return
 			}
 			if err := controller.Flush(); err != nil {
