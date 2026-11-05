@@ -28,3 +28,50 @@ func BenchmarkCertificateVerification(b *testing.B) {
 		}
 	}
 }
+
+// Query workloads isolate reads from signing, fsync and fixture construction.
+func benchmarkQueryStore(b *testing.B) (*Store, protocol.Account) {
+	b.Helper()
+	key := ed25519.NewKeyFromSeed(make([]byte, 32))
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	g := protocol.Genesis{Version: 1, Name: "benchmark", Supply: 10000, Allocations: []protocol.Allocation{{Account: a, Balance: 10000, Representative: a}}}
+	s, err := Open(b.TempDir(), g)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { s.Close() })
+	for i := 0; i < 1000; i++ {
+		account := s.state.accounts[a]
+		block := protocol.Block{Version: 1, Network: g.ID(), Kind: "send", Account: a, Previous: account.Frontier, Representative: a, Balance: account.Balance - 1, Link: string(a)}
+		if err := block.Sign(key); err != nil {
+			b.Fatal(err)
+		}
+		r := Record{Height: uint64(i + 1), Previous: s.state.tip, Block: block}
+		s.state.apply(r)
+	}
+	return s, a
+}
+func BenchmarkHistoryPage(b *testing.B) {
+	s, a := benchmarkQueryStore(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = s.History(a, 500, 20)
+	}
+}
+func BenchmarkReceivablePage(b *testing.B) {
+	s, a := benchmarkQueryStore(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = s.Receivables(a, 500, 20)
+	}
+}
+func BenchmarkLedgerStatus(b *testing.B) {
+	s, _ := benchmarkQueryStore(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = s.Status()
+	}
+}
