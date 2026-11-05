@@ -162,10 +162,11 @@ func certificate(r Record, network protocol.Hash, weights map[protocol.Account]p
 	if len(r.Votes) == 0 || len(r.Votes) > protocol.MaxRepresentatives {
 		return fmt.Errorf("%w: certificate size", ErrInvalid)
 	}
+	blockID := r.Block.ID()
 	seen := make(map[protocol.Account]bool, len(r.Votes))
 	var sum uint64
 	for _, v := range r.Votes {
-		if v.Network != network || v.Height != r.Height || v.Round != r.Round || v.Parent != r.Previous || v.Block != r.Block.ID() || v.Phase != "precommit" {
+		if v.Network != network || v.Height != r.Height || v.Round != r.Round || v.Parent != r.Previous || v.Block != blockID || v.Phase != "precommit" {
 			return fmt.Errorf("%w: certificate vote binding", ErrInvalid)
 		}
 		if seen[v.Representative] {

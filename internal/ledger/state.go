@@ -140,15 +140,16 @@ func (s *state) apply(r Record, serializedSize ...int) {
 	}
 	s.recordSizes = append(s.recordSizes, uint32(size))
 	b := r.Block
+	id := b.ID()
 	a := s.accounts[b.Account]
 	switch b.Kind {
 	case "send":
-		s.receivables[b.ID()] = Receivable{Source: b.ID(), From: b.Account, To: protocol.Account(b.Link), Amount: a.Balance - b.Balance}
+		s.receivables[id] = Receivable{Source: id, From: b.Account, To: protocol.Account(b.Link), Amount: a.Balance - b.Balance}
 	case "receive":
 		delete(s.receivables, protocol.Hash(b.Link))
 	}
-	s.accounts[b.Account] = AccountState{Account: b.Account, Frontier: b.ID(), Balance: b.Balance, Representative: b.Representative, Height: a.Height + 1}
-	s.blocks[b.ID()] = b
+	s.accounts[b.Account] = AccountState{Account: b.Account, Frontier: id, Balance: b.Balance, Representative: b.Representative, Height: a.Height + 1}
+	s.blocks[id] = b
 	s.records = append(s.records, r)
 	s.tip = r.ID()
 }
