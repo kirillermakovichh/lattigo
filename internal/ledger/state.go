@@ -8,6 +8,7 @@ import (
 )
 
 type state struct {
+	network     protocol.Hash
 	genesis     protocol.Genesis
 	accounts    map[protocol.Account]AccountState
 	receivables map[protocol.Hash]Receivable
@@ -18,7 +19,9 @@ type state struct {
 }
 
 func newState(g protocol.Genesis) *state {
-	s := &state{genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: g.ID()}
+	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
+	network := g.ID()
+	s := &state{network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
 	for _, a := range g.Allocations {
 		s.accounts[a.Account] = AccountState{Account: a.Account, Balance: a.Balance, Representative: a.Representative}
 	}
@@ -35,7 +38,7 @@ func (s *state) weights() map[protocol.Account]protocol.Amount {
 	return w
 }
 func (s *state) validate(b protocol.Block) error {
-	if b.Network != s.genesis.ID() {
+	if b.Network != s.network {
 		return fmt.Errorf("%w: wrong network", ErrInvalid)
 	}
 	if e := b.Verify(); e != nil {
@@ -125,7 +128,7 @@ func (s *state) validateRecord(r Record) error {
 	if e := s.validate(r.Block); e != nil {
 		return e
 	}
-	return certificate(r, s.genesis.ID(), s.weights(), s.genesis.Supply)
+	return certificate(r, s.network, s.weights(), s.genesis.Supply)
 }
 func (s *state) apply(r Record, serializedSize ...int) {
 	size := 0

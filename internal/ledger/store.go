@@ -134,7 +134,7 @@ func (s *Store) Status() Status {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	a := s.state
-	return Status{HistoryBytes: s.historyBytes, HistoryLimitBytes: s.historyLimit, CapacityReached: s.historyBytes+storage.MaxFrame > s.historyLimit, Network: a.genesis.ID(), Height: uint64(len(a.records)), Tip: a.tip, Supply: a.genesis.Supply, Accounts: len(a.accounts), Receivables: len(a.receivables)}
+	return Status{HistoryBytes: s.historyBytes, HistoryLimitBytes: s.historyLimit, CapacityReached: s.historyBytes+storage.MaxFrame > s.historyLimit, Network: a.network, Height: uint64(len(a.records)), Tip: a.tip, Supply: a.genesis.Supply, Accounts: len(a.accounts), Receivables: len(a.receivables)}
 }
 func (s *Store) Account(a protocol.Account) (AccountState, error) {
 	s.mu.RLock()

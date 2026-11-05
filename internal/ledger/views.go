@@ -39,7 +39,7 @@ func (s *Store) anchorLocked(anchor Anchor, current bool) (Anchor, error) {
 	if anchor.Height > height {
 		return Anchor{}, ErrStaleView
 	}
-	tip := s.state.genesis.ID()
+	tip := s.state.network
 	if anchor.Height > 0 {
 		tip = s.state.records[anchor.Height-1].ID()
 	}

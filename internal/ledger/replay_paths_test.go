@@ -92,6 +92,7 @@ func TestRepresentativeLimitPreservesExistingCommittee(t *testing.T) {
 	owner := protocol.Address(key.Public().(ed25519.PublicKey))
 	state.genesis.Supply = protocol.Amount(protocol.MaxRepresentatives + 1)
 	state.genesis.Allocations[0].Balance = state.genesis.Supply
+	state = newState(state.genesis)
 	state.accounts[owner] = AccountState{Account: owner, Representative: owner, Balance: 1}
 	// A conserved snapshot attainable by opening funded accounts. One account
 	// retains delegation to the owner, so changing the owner splits its weight.

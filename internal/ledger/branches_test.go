@@ -76,6 +76,7 @@ func TestLedgerTransitionRejectionBranches(t *testing.T) {
 	}
 	workState, workKey, _ := fixture(t)
 	workState.genesis.WorkBits = 8
+	workState = newState(workState.genesis)
 	base.Network = workState.genesis.ID()
 	if err := base.Sign(workKey); err != nil {
 		t.Fatal(err)
