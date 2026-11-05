@@ -418,7 +418,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-064 | [x] | Client parses bounded SSE frames and cancellation | Focused Go tests and race checks |
 | BL-065 | [x] | Client reconnects with bounded backoff and resumes delivered events | Focused Go tests and race checks |
 | BL-066 | [x] | Wallet watch prints confirmed events without exposing keys | Focused Go tests and race checks |
-| BL-067 | [ ] | Incoming event filters select account transfers | Focused Go tests and race checks |
+| BL-067 | [x] | Incoming event filters select account transfers | Focused Go tests and race checks |
 | BL-068 | [ ] | Slow subscribers and disconnected streams release capacity | Focused Go tests and race checks |
 | BL-069 | [ ] | Restarted event streams replay persistent confirmation heights | Focused Go tests and race checks |
 

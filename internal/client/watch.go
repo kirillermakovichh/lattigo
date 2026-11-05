@@ -45,6 +45,14 @@ func (c *Client) Watch(ctx context.Context, options EventOptions, consume func(E
 			return options.After, err
 		}
 	}
+	if options.Address != "" {
+		if _, err := options.Address.PublicKey(); err != nil {
+			return options.After, err
+		}
+	}
+	if options.Incoming && options.Address == "" {
+		return options.After, errors.New("incoming requires address")
+	}
 	attempt := uint(0)
 	for {
 		before := options.After

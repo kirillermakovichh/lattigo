@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -94,5 +95,34 @@ func TestEventResumeScope(t *testing.T) {
 	line, err := bufio.NewReader(resp.Body).ReadString('\n')
 	if err != nil || line != "id: "+string(network)+":3\n" {
 		t.Fatal(line, err)
+	}
+}
+
+func TestIncomingEventFilterAdvancesCheckpoint(t *testing.T) {
+	api, a, _ := pageFixture(t)
+	server := httptest.NewServer(api.Handler())
+	defer server.Close()
+	defer api.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", server.URL+"/v1/events?address="+string(a)+"&incoming=true", nil)
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	reader := bufio.NewReader(resp.Body)
+	for height := 1; height <= 3; height++ {
+		id, err := reader.ReadString('\n')
+		if err != nil || !strings.HasSuffix(id, fmt.Sprintf(":%d\n", height)) {
+			t.Fatal(id, err)
+		}
+		kind, _ := reader.ReadString('\n')
+		data, _ := reader.ReadString('\n')
+		_, _ = reader.ReadString('\n')
+		// The fixture sends to itself, so incoming sends must be retained.
+		if kind != "event: confirmed\n" || !strings.Contains(data, "block") {
+			t.Fatal(kind, data)
+		}
 	}
 }

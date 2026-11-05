@@ -61,3 +61,25 @@ func TestEventParserBoundsAndRejectsMalformedFrames(t *testing.T) {
 		}
 	}
 }
+
+func TestFilteredCheckpointsResumeWithoutFinancialCallback(t *testing.T) {
+	options, frame := eventFixture(t, 2)
+	var b struct {
+		Block protocol.Block `json:"block"`
+	}
+	start := strings.Index(frame, "data: ") + 6
+	if err := json.Unmarshal([]byte(strings.TrimSpace(frame[start:])), &b); err != nil {
+		t.Fatal(err)
+	}
+	options.Address = b.Block.Account
+	checkpoint := fmt.Sprintf("id: %s\nevent: checkpoint\ndata: {\"height\":1}\n\n", event.ID(options.Network, 1))
+	count := 0
+	last, err := parseEvents(context.Background(), strings.NewReader(checkpoint+frame), options, func(Event) error { count++; return nil })
+	if !errors.Is(err, io.EOF) || count != 1 || last != event.ID(options.Network, 2) {
+		t.Fatal(last, count, err)
+	}
+	options.Address = ""
+	if _, err := parseEvents(context.Background(), strings.NewReader(checkpoint), options, func(Event) error { return nil }); !errors.Is(err, ErrEventProtocol) {
+		t.Fatal(err)
+	}
+}

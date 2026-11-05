@@ -187,3 +187,9 @@ between187ms and8s, resuming the last successful callback position. Consumer and
 protocol failures stop it; transient HTTP failures and `event_ahead` are retried.
 Caller cancellation ends both active reads and reconnect waits. Callbacks must
 return promptly and implement their own idempotency if delivery has side effects.
+
+Event filters accept `address=ADDRESS` for account-chain events, or additionally
+`incoming=true` for sends whose destination is that account. Filtered records emit
+`checkpoint` frames containing only height and the durable ID; the SDK advances
+its resume position without invoking the payment callback. This avoids replaying
+nonmatching tails after reconnect. Incoming requires an explicit address.

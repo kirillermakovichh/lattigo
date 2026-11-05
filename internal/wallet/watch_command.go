@@ -19,8 +19,10 @@ func watchCommand(ctx context.Context, args []string, out, errout io.Writer) err
 	f.add(fs)
 	var address, after string
 	var count int
+	var incoming bool
 	fs.StringVar(&address, "address", "", "optional account filter; explicit addresses need no wallet")
 	fs.StringVar(&after, "after", "", "last successfully consumed event ID")
+	fs.BoolVar(&incoming, "incoming", false, "only sends addressed to the account")
 	fs.IntVar(&count, "count", 0, "stop after this many matching events; zero watches until timeout")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -48,10 +50,7 @@ func watchCommand(ctx context.Context, args []string, out, errout io.Writer) err
 		return errors.New("RPC network differs from expected network")
 	}
 	delivered := 0
-	_, err = c.Watch(ctx, client.EventOptions{Network: status.Network, After: after}, func(e client.Event) error {
-		if address != "" && e.Block.Account != protocol.Account(address) {
-			return nil
-		}
+	_, err = c.Watch(ctx, client.EventOptions{Network: status.Network, After: after, Address: protocol.Account(address), Incoming: incoming}, func(e client.Event) error {
 		if err := output(out, e); err != nil {
 			return err
 		}

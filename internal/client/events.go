@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"example.com/go-block-lattice/internal/event"
@@ -27,8 +28,10 @@ type Event struct {
 }
 
 type EventOptions struct {
-	Network protocol.Hash
-	After   string
+	Network  protocol.Hash
+	After    string
+	Address  protocol.Account
+	Incoming bool
 }
 
 // Events consumes one connection. The returned position advances only after a
@@ -45,7 +48,22 @@ func (c *Client) Events(ctx context.Context, options EventOptions, consume func(
 			return options.After, err
 		}
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", c.base+"/v1/events", nil)
+	if options.Address != "" {
+		if _, err := options.Address.PublicKey(); err != nil {
+			return options.After, err
+		}
+	}
+	if options.Incoming && options.Address == "" {
+		return options.After, errors.New("incoming requires address")
+	}
+	query := url.Values{}
+	if options.Address != "" {
+		query.Set("address", string(options.Address))
+	}
+	if options.Incoming {
+		query.Set("incoming", "true")
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", c.base+"/v1/events?"+query.Encode(), nil)
 	if err != nil {
 		return options.After, err
 	}
@@ -127,18 +145,36 @@ func parseEvents(ctx context.Context, source io.Reader, options EventOptions, co
 				continue
 			}
 			height, err := event.ParseID(id, options.Network)
-			if err != nil || height <= previous || kind != "confirmed" {
+			if err != nil || height <= previous || (kind != "confirmed" && kind != "checkpoint") {
 				return last, fmt.Errorf("%w: event scope or order", ErrEventProtocol)
 			}
 			var record struct {
 				Height uint64         `json:"height"`
 				Block  protocol.Block `json:"block"`
 			}
-			if json.Unmarshal(data, &record) != nil || record.Height != height || record.Block.Network != options.Network || record.Block.Verify() != nil {
-				return last, fmt.Errorf("%w: confirmed record", ErrEventProtocol)
+			if json.Unmarshal(data, &record) != nil || record.Height != height {
+				return last, fmt.Errorf("%w: record height", ErrEventProtocol)
 			}
-			if err := consume(Event{ID: id, Height: height, Block: record.Block, Record: append(json.RawMessage(nil), data...)}); err != nil {
-				return last, &eventConsumerError{err}
+			if kind == "checkpoint" {
+				if options.Address == "" {
+					return last, fmt.Errorf("%w: unsolicited checkpoint", ErrEventProtocol)
+				}
+			} else {
+				if record.Block.Network != options.Network || record.Block.Verify() != nil {
+					return last, fmt.Errorf("%w: confirmed record", ErrEventProtocol)
+				}
+				if options.Address != "" {
+					match := record.Block.Account == options.Address
+					if options.Incoming {
+						match = record.Block.Kind == "send" && record.Block.Link == string(options.Address)
+					}
+					if !match {
+						return last, fmt.Errorf("%w: event filter", ErrEventProtocol)
+					}
+				}
+				if err := consume(Event{ID: id, Height: height, Block: record.Block, Record: append(json.RawMessage(nil), data...)}); err != nil {
+					return last, &eventConsumerError{err}
+				}
 			}
 			last = id
 			previous = height

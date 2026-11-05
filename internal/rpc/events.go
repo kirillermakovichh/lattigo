@@ -3,8 +3,10 @@ package rpc
 import (
 	"encoding/json"
 	"errors"
+	"example.com/go-block-lattice/internal/protocol"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"example.com/go-block-lattice/internal/event"
@@ -16,13 +18,16 @@ const eventHeartbeat = 15 * time.Second
 const maxEventData = 16 << 20
 
 func writeEvent(w http.ResponseWriter, controller *http.ResponseController, id string, data []byte) error {
+	return writeEventKind(w, controller, id, "confirmed", data)
+}
+func writeEventKind(w http.ResponseWriter, controller *http.ResponseController, id, kind string, data []byte) error {
 	if len(data) > maxEventData {
 		return errors.New("event exceeds frame budget")
 	}
 	if err := controller.SetWriteDeadline(time.Now().Add(eventWriteTimeout)); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "id: %s\nevent: confirmed\ndata: %s\n\n", id, data); err != nil {
+	if _, err := fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", id, kind, data); err != nil {
 		return err
 	}
 	return controller.Flush()
@@ -30,8 +35,35 @@ func writeEvent(w http.ResponseWriter, controller *http.ResponseController, id s
 
 // events tails durable records directly, without retaining subscriber queues.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
-	if r.URL.RawQuery != "" {
-		writeError(w, 400, "invalid_events", "event query fields are unsupported")
+	if len(r.URL.RawQuery) > 512 {
+		writeError(w, 400, "invalid_events", "query exceeds limit")
+		return
+	}
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		writeError(w, 400, "invalid_events", "invalid query")
+		return
+	}
+	for key, values := range query {
+		if (key != "address" && key != "incoming") || len(values) != 1 {
+			writeError(w, 400, "invalid_events", "unknown or repeated filter")
+			return
+		}
+	}
+	address := protocol.Account(query.Get("address"))
+	if address != "" {
+		if _, err := address.PublicKey(); err != nil {
+			writeError(w, 400, "invalid_address", err.Error())
+			return
+		}
+	}
+	incoming := query.Get("incoming") == "true"
+	if value := query.Get("incoming"); value != "" && value != "true" && value != "false" {
+		writeError(w, 400, "invalid_events", "incoming must be true or false")
+		return
+	}
+	if incoming && address == "" {
+		writeError(w, 400, "invalid_events", "incoming requires address")
 		return
 	}
 	network := s.cfg.Store.Status().Network
@@ -77,11 +109,23 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	for {
 		record, changed, err := s.cfg.Store.ObserveRecord(after)
 		if err == nil {
-			data, err := json.Marshal(record)
+			kind := "confirmed"
+			var payload any = record
+			match := address == "" || record.Block.Account == address
+			if incoming {
+				match = record.Block.Kind == "send" && record.Block.Link == string(address)
+			}
+			if !match {
+				kind = "checkpoint"
+				payload = struct {
+					Height uint64 `json:"height"`
+				}{record.Height}
+			}
+			data, err := json.Marshal(payload)
 			if err != nil {
 				return
 			}
-			if err := writeEvent(w, controller, event.ID(network, record.Height), data); err != nil {
+			if err := writeEventKind(w, controller, event.ID(network, record.Height), kind, data); err != nil {
 				return
 			}
 			after = record.Height
