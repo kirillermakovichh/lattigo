@@ -226,3 +226,11 @@ The JSON result contains confirmed `completed` receipts and, after uncertain sub
 `pending` intent plus an error; a partial failure exits unsuccessfully. Retry that exact
 outbox before continuing. `limit_reached` means the batch processed its configured
 count, not a claim that more receivables exist. An empty list succeeds without signing.
+
+## Watching confirmations
+
+`blwallet watch --rpc ORIGIN --address ADDRESS --count 10 --timeout 5m` emits
+confirmed events with resumable IDs. Explicit addresses require no wallet or
+spending password. Omit the address to observe the full network; use `--after ID`
+to resume and `--expected-network HASH` to pin the trusted node. A zero count
+watches until the configured timeout or cancellation.
