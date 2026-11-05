@@ -181,3 +181,9 @@ a pinned network and optional resume ID. Parsing bounds every complete or partia
 frame to16MiB plus1KiB and verifies block signatures, network, height and ordering.
 The returned ID advances only after the callback succeeds; incomplete frames and
 consumer failures remain unacknowledged. Confirmation still trusts the chosen node.
+
+`Client.Watch` reconnects with a reproducible jittered exponential delay bounded
+between187ms and8s, resuming the last successful callback position. Consumer and
+protocol failures stop it; transient HTTP failures and `event_ahead` are retried.
+Caller cancellation ends both active reads and reconnect waits. Callbacks must
+return promptly and implement their own idempotency if delivery has side effects.
