@@ -197,22 +197,18 @@ func (s *Store) History(a protocol.Account, offset, limit int) []Record {
 		limit = 1000
 	}
 	out := make([]Record, 0)
-	seen := 0
+	heights := s.state.history[a]
+	if offset >= len(heights) {
+		return out
+	}
 	bytes := uint64(2)
-	for i := len(s.state.records) - 1; i >= 0; i-- {
-		r := s.state.records[i]
-		if r.Block.Account != a {
-			continue
-		}
-		if seen < offset {
-			seen++
-			continue
-		}
+	for at := len(heights) - 1 - offset; at >= 0; at-- {
+		i := int(heights[at] - 1)
 		size := uint64(s.state.recordSizes[i]) + 1
 		if len(out) > 0 && bytes+size > 16<<20 {
 			break
 		}
-		out = append(out, copyRecord(r))
+		out = append(out, copyRecord(s.state.records[i]))
 		bytes += size
 		if len(out) >= limit {
 			break

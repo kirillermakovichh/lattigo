@@ -8,6 +8,7 @@ import (
 )
 
 type state struct {
+	history     map[protocol.Account][]uint64
 	network     protocol.Hash
 	genesis     protocol.Genesis
 	accounts    map[protocol.Account]AccountState
@@ -21,7 +22,7 @@ type state struct {
 func newState(g protocol.Genesis) *state {
 	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
 	network := g.ID()
-	s := &state{network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
+	s := &state{history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
 	for _, a := range g.Allocations {
 		s.accounts[a.Account] = AccountState{Account: a.Account, Balance: a.Balance, Representative: a.Representative}
 	}
@@ -151,5 +152,6 @@ func (s *state) apply(r Record, serializedSize ...int) {
 	s.accounts[b.Account] = AccountState{Account: b.Account, Frontier: id, Balance: b.Balance, Representative: b.Representative, Height: a.Height + 1}
 	s.blocks[id] = b
 	s.records = append(s.records, r)
+	s.history[b.Account] = append(s.history[b.Account], r.Height)
 	s.tip = r.ID()
 }

@@ -74,12 +74,12 @@ func (s *Store) HistoryView(a protocol.Account, anchor Anchor, before uint64, li
 		return result, ErrInvalid
 	}
 	retained := uint64(2)
-	for i := int(before); i > 0; i-- {
-		r := s.state.records[i-1]
-		if r.Block.Account != a {
-			continue
-		}
-		size := uint64(s.state.recordSizes[i-1]) + 1
+	heights := s.state.history[a]
+	end := sort.Search(len(heights), func(i int) bool { return heights[i] > before })
+	for at := end - 1; at >= 0; at-- {
+		i := int(heights[at] - 1)
+		r := s.state.records[i]
+		size := uint64(s.state.recordSizes[i]) + 1
 		if len(result.Items) >= limit || (len(result.Items) > 0 && retained+size > 16<<20) {
 			result.More = true
 			result.Before = result.Items[len(result.Items)-1].Height - 1
