@@ -113,8 +113,8 @@ func (s *Store) ReceivableView(a protocol.Account, anchor Anchor, after protocol
 		return result, err
 	}
 	result.Anchor = view
-	for _, row := range s.state.receivables {
-		if row.To == a && row.Source > after {
+	for _, row := range s.state.byDestination[a] {
+		if row.Source > after {
 			result.Items = append(result.Items, row)
 		}
 	}

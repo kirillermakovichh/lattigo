@@ -171,10 +171,8 @@ func (s *Store) Receivables(a protocol.Account, offset, limit int) []Receivable 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v := make([]Receivable, 0)
-	for _, r := range s.state.receivables {
-		if r.To == a {
-			v = append(v, r)
-		}
+	for _, r := range s.state.byDestination[a] {
+		v = append(v, r)
 	}
 	sort.Slice(v, func(i, j int) bool { return v[i].Source < v[j].Source })
 	start, end := page(offset, limit, len(v))

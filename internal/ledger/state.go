@@ -8,21 +8,22 @@ import (
 )
 
 type state struct {
-	history     map[protocol.Account][]uint64
-	network     protocol.Hash
-	genesis     protocol.Genesis
-	accounts    map[protocol.Account]AccountState
-	receivables map[protocol.Hash]Receivable
-	blocks      map[protocol.Hash]protocol.Block
-	records     []Record
-	recordSizes []uint32
-	tip         protocol.Hash
+	byDestination map[protocol.Account]map[protocol.Hash]Receivable
+	history       map[protocol.Account][]uint64
+	network       protocol.Hash
+	genesis       protocol.Genesis
+	accounts      map[protocol.Account]AccountState
+	receivables   map[protocol.Hash]Receivable
+	blocks        map[protocol.Hash]protocol.Block
+	records       []Record
+	recordSizes   []uint32
+	tip           protocol.Hash
 }
 
 func newState(g protocol.Genesis) *state {
 	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
 	network := g.ID()
-	s := &state{history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
+	s := &state{byDestination: make(map[protocol.Account]map[protocol.Hash]Receivable), history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
 	for _, a := range g.Allocations {
 		s.accounts[a.Account] = AccountState{Account: a.Account, Balance: a.Balance, Representative: a.Representative}
 	}
@@ -146,8 +147,17 @@ func (s *state) apply(r Record, serializedSize ...int) {
 	switch b.Kind {
 	case "send":
 		s.receivables[id] = Receivable{Source: id, From: b.Account, To: protocol.Account(b.Link), Amount: a.Balance - b.Balance}
+		to := protocol.Account(b.Link)
+		if s.byDestination[to] == nil {
+			s.byDestination[to] = make(map[protocol.Hash]Receivable)
+		}
+		s.byDestination[to][id] = s.receivables[id]
 	case "receive":
 		delete(s.receivables, protocol.Hash(b.Link))
+		delete(s.byDestination[b.Account], protocol.Hash(b.Link))
+		if len(s.byDestination[b.Account]) == 0 {
+			delete(s.byDestination, b.Account)
+		}
 	}
 	s.accounts[b.Account] = AccountState{Account: b.Account, Frontier: id, Balance: b.Balance, Representative: b.Representative, Height: a.Height + 1}
 	s.blocks[id] = b
