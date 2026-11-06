@@ -194,8 +194,8 @@ func (s *Store) History(a protocol.Account, offset, limit int) []Record {
 	if limit > 1000 {
 		limit = 1000
 	}
-	out := make([]Record, 0)
 	heights := s.state.history[a]
+	out := make([]Record, 0, min(limit, max(0, len(heights)-offset), 64))
 	if offset >= len(heights) {
 		return out
 	}
@@ -228,7 +228,7 @@ func (s *Store) Records(after uint64, limit int) []Record {
 	if limit > 1000 {
 		limit = 1000
 	}
-	out := make([]Record, 0)
+	out := make([]Record, 0, min(limit, len(s.state.records)-int(after), 64))
 	bytes := uint64(2)
 	for i := int(after); i < len(s.state.records) && len(out) < limit; i++ {
 		size := uint64(s.state.recordSizes[i]) + 1

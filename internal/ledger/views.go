@@ -76,6 +76,7 @@ func (s *Store) HistoryView(a protocol.Account, anchor Anchor, before uint64, li
 	retained := uint64(2)
 	heights := s.state.history[a]
 	end := sort.Search(len(heights), func(i int) bool { return heights[i] > before })
+	result.Items = make([]Record, 0, min(limit, end, 64))
 	for at := end - 1; at >= 0; at-- {
 		i := int(heights[at] - 1)
 		r := s.state.records[i]
@@ -119,6 +120,7 @@ func (s *Store) ReceivableView(a protocol.Account, anchor Anchor, after protocol
 	if end > len(keys) {
 		end = len(keys)
 	}
+	result.Items = make([]Receivable, 0, end-start)
 	for _, id := range keys[start:end] {
 		result.Items = append(result.Items, s.state.receivables[id])
 	}
