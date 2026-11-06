@@ -5,10 +5,11 @@ import (
 	"example.com/go-block-lattice/internal/protocol"
 	"fmt"
 	"math"
+	"sort"
 )
 
 type state struct {
-	byDestination map[protocol.Account]map[protocol.Hash]Receivable
+	byDestination map[protocol.Account][]protocol.Hash
 	history       map[protocol.Account][]uint64
 	network       protocol.Hash
 	genesis       protocol.Genesis
@@ -23,7 +24,7 @@ type state struct {
 func newState(g protocol.Genesis) *state {
 	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
 	network := g.ID()
-	s := &state{byDestination: make(map[protocol.Account]map[protocol.Hash]Receivable), history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
+	s := &state{byDestination: make(map[protocol.Account][]protocol.Hash), history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
 	for _, a := range g.Allocations {
 		s.accounts[a.Account] = AccountState{Account: a.Account, Balance: a.Balance, Representative: a.Representative}
 	}
@@ -148,13 +149,19 @@ func (s *state) apply(r Record, serializedSize ...int) {
 	case "send":
 		s.receivables[id] = Receivable{Source: id, From: b.Account, To: protocol.Account(b.Link), Amount: a.Balance - b.Balance}
 		to := protocol.Account(b.Link)
-		if s.byDestination[to] == nil {
-			s.byDestination[to] = make(map[protocol.Hash]Receivable)
-		}
-		s.byDestination[to][id] = s.receivables[id]
+		keys := s.byDestination[to]
+		at := sort.Search(len(keys), func(i int) bool { return keys[i] >= id })
+		keys = append(keys, "")
+		copy(keys[at+1:], keys[at:])
+		keys[at] = id
+		s.byDestination[to] = keys
 	case "receive":
 		delete(s.receivables, protocol.Hash(b.Link))
-		delete(s.byDestination[b.Account], protocol.Hash(b.Link))
+		keys := s.byDestination[b.Account]
+		at := sort.Search(len(keys), func(i int) bool { return keys[i] >= protocol.Hash(b.Link) })
+		copy(keys[at:], keys[at+1:])
+		keys[len(keys)-1] = ""
+		s.byDestination[b.Account] = keys[:len(keys)-1]
 		if len(s.byDestination[b.Account]) == 0 {
 			delete(s.byDestination, b.Account)
 		}

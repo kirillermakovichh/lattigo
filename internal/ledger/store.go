@@ -170,13 +170,13 @@ func page(offset, limit, n int) (int, int) {
 func (s *Store) Receivables(a protocol.Account, offset, limit int) []Receivable {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	v := make([]Receivable, 0)
-	for _, r := range s.state.byDestination[a] {
-		v = append(v, r)
+	keys := s.state.byDestination[a]
+	start, end := page(offset, limit, len(keys))
+	v := make([]Receivable, 0, end-start)
+	for _, id := range keys[start:end] {
+		v = append(v, s.state.receivables[id])
 	}
-	sort.Slice(v, func(i, j int) bool { return v[i].Source < v[j].Source })
-	start, end := page(offset, limit, len(v))
-	return v[start:end]
+	return v
 }
 func copyRecord(r Record) Record { r.Votes = append([]Vote(nil), r.Votes...); return r }
 

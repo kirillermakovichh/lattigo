@@ -113,16 +113,18 @@ func (s *Store) ReceivableView(a protocol.Account, anchor Anchor, after protocol
 		return result, err
 	}
 	result.Anchor = view
-	for _, row := range s.state.byDestination[a] {
-		if row.Source > after {
-			result.Items = append(result.Items, row)
-		}
+	keys := s.state.byDestination[a]
+	start := sort.Search(len(keys), func(i int) bool { return keys[i] > after })
+	end := start + limit
+	if end > len(keys) {
+		end = len(keys)
 	}
-	sort.Slice(result.Items, func(i, j int) bool { return result.Items[i].Source < result.Items[j].Source })
-	if len(result.Items) > limit {
-		result.Items = result.Items[:limit]
+	for _, id := range keys[start:end] {
+		result.Items = append(result.Items, s.state.receivables[id])
+	}
+	if end < len(keys) {
 		result.More = true
-		result.After = result.Items[len(result.Items)-1].Source
+		result.After = keys[end-1]
 	}
 	return result, nil
 }
