@@ -285,7 +285,7 @@ func (e *Engine) Health() map[string]any {
 	if e.failure != nil {
 		errText = e.failure.Error()
 	}
-	return map[string]any{"ready": e.failure == nil && !status.CapacityReached, "error": errText, "capacity_reached": status.CapacityReached, "height": e.state.Height, "round": e.state.Round, "pending": len(e.pending), "representative": e.state.Representative, "observed_voting_weight": online, "quorum_weight": protocol.Amount(uint64(e.cfg.Store.Status().Supply)/3*2 + (uint64(e.cfg.Store.Status().Supply)%3*2)/3 + 1)}
+	return map[string]any{"ready": e.failure == nil && !status.CapacityReached, "error": errText, "capacity_reached": status.CapacityReached, "height": e.state.Height, "round": e.state.Round, "pending": len(e.pending), "representative": e.state.Representative, "observed_voting_weight": online, "quorum_weight": protocol.Amount(uint64(status.Supply)/3*2 + (uint64(status.Supply)%3*2)/3 + 1)}
 }
 func (e *Engine) Run(ctx context.Context) error {
 	e.mu.Lock()
