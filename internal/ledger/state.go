@@ -9,6 +9,8 @@ import (
 )
 
 type state struct {
+	delegated     map[protocol.Account]protocol.Amount
+	owned         map[protocol.Account]protocol.Amount
 	byDestination map[protocol.Account][]protocol.Hash
 	history       map[protocol.Account][]uint64
 	network       protocol.Hash
@@ -24,22 +26,22 @@ type state struct {
 func newState(g protocol.Genesis) *state {
 	g.Allocations = append([]protocol.Allocation(nil), g.Allocations...)
 	network := g.ID()
-	s := &state{byDestination: make(map[protocol.Account][]protocol.Hash), history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
+	s := &state{delegated: make(map[protocol.Account]protocol.Amount), owned: make(map[protocol.Account]protocol.Amount), byDestination: make(map[protocol.Account][]protocol.Hash), history: make(map[protocol.Account][]uint64), network: network, genesis: g, accounts: make(map[protocol.Account]AccountState), receivables: make(map[protocol.Hash]Receivable), blocks: make(map[protocol.Hash]protocol.Block), tip: network}
 	for _, a := range g.Allocations {
 		s.accounts[a.Account] = AccountState{Account: a.Account, Balance: a.Balance, Representative: a.Representative}
+		s.owned[a.Account] = a.Balance
+		s.delegated[a.Representative] += a.Balance
 	}
 	return s
 }
 func (s *state) weights() map[protocol.Account]protocol.Amount {
-	w := make(map[protocol.Account]protocol.Amount)
-	for _, a := range s.accounts {
-		w[a.Representative] += a.Balance
-	}
-	for _, r := range s.receivables {
-		w[s.accounts[r.From].Representative] += r.Amount
+	w := make(map[protocol.Account]protocol.Amount, len(s.delegated))
+	for rep, weight := range s.delegated {
+		w[rep] = weight
 	}
 	return w
 }
+
 func (s *state) validate(b protocol.Block) error {
 	if b.Network != s.network {
 		return fmt.Errorf("%w: wrong network", ErrInvalid)
@@ -93,12 +95,7 @@ func (s *state) validate(b protocol.Block) error {
 // representativeCapacity evaluates the next weight view without mutating state.
 func (s *state) representativeCapacity(b protocol.Block, a AccountState, exists bool) bool {
 	weights := s.weights()
-	owned := a.Balance
-	for _, r := range s.receivables {
-		if r.From == b.Account {
-			owned += r.Amount
-		}
-	}
+	owned := s.owned[b.Account]
 	if exists {
 		weights[a.Representative] -= owned
 	}
@@ -145,6 +142,25 @@ func (s *state) apply(r Record, serializedSize ...int) {
 	b := r.Block
 	id := b.ID()
 	a := s.accounts[b.Account]
+	nextOwned := s.owned[b.Account]
+	if a.Account != "" {
+		s.delegated[a.Representative] -= nextOwned
+	}
+	if b.Kind == "receive" {
+		received := s.receivables[protocol.Hash(b.Link)]
+		if received.From != b.Account {
+			s.delegated[s.accounts[received.From].Representative] -= received.Amount
+			s.owned[received.From] -= received.Amount
+			nextOwned += received.Amount
+		}
+	}
+	s.owned[b.Account] = nextOwned
+	s.delegated[b.Representative] += nextOwned
+	for rep, weight := range s.delegated {
+		if weight == 0 {
+			delete(s.delegated, rep)
+		}
+	}
 	switch b.Kind {
 	case "send":
 		s.receivables[id] = Receivable{Source: id, From: b.Account, To: protocol.Account(b.Link), Amount: a.Balance - b.Balance}
