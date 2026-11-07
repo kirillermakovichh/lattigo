@@ -41,6 +41,8 @@ type peer struct {
 	height        atomic.Uint64
 	queued        atomic.Int64
 	pendingCursor int
+	failures      atomic.Uint64
+	retryAt       atomic.Int64
 }
 type rate struct {
 	tokens  float64
@@ -183,16 +185,31 @@ func (n *Network) runPeer(ctx context.Context, p *peer) {
 			return
 		case raw := <-p.queue:
 			p.queued.Add(-int64(len(raw)))
+			if time.Now().UnixNano() < p.retryAt.Load() {
+				continue
+			}
 			if err := n.request(ctx, p, "POST", "/p2p/message", raw, nil); err != nil {
 				p.connected.Store(false)
 			}
 		case <-ticker.C:
-			n.syncPeer(ctx, p)
+			if time.Now().UnixNano() >= p.retryAt.Load() {
+				n.syncPeer(ctx, p)
+			}
 		}
 	}
 }
 
-func (n *Network) request(ctx context.Context, p *peer, method, path string, body []byte, result any) error {
+func (n *Network) request(ctx context.Context, p *peer, method, path string, body []byte, result any) (requestErr error) {
+	defer func() {
+		if requestErr != nil {
+			attempt := p.failures.Add(1) - 1
+			p.retryAt.Store(time.Now().Add(retryDelay(p.url, attempt)).UnixNano())
+			p.connected.Store(false)
+		} else {
+			p.failures.Store(0)
+			p.retryAt.Store(0)
+		}
+	}()
 	req, err := http.NewRequestWithContext(ctx, method, p.url+path, bytes.NewReader(body))
 	if err != nil {
 		return err
