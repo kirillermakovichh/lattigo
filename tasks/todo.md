@@ -420,7 +420,7 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-066 | [x] | Wallet watch prints confirmed events without exposing keys | Focused Go tests and race checks |
 | BL-067 | [x] | Incoming event filters select account transfers | Focused Go tests and race checks |
 | BL-068 | [x] | Slow subscribers and disconnected streams release capacity | Focused Go tests and race checks |
-| BL-069 | [ ] | Restarted event streams replay persistent confirmation heights | Focused Go tests and race checks |
+| BL-069 | [x] | Restarted event streams replay persistent confirmation heights | Focused Go tests and race checks |
 
 ### Peers
 
@@ -443,18 +443,18 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
-| BL-082 | [ ] | Protocol and certificate benchmarks establish reproducible workloads | Benchmarks and invariant tests |
-| BL-083 | [ ] | History and receivable benchmarks separate ledger query costs | Benchmarks and invariant tests |
-| BL-084 | [ ] | Ledger caches its immutable network identity | Benchmarks and invariant tests |
-| BL-085 | [ ] | Ledger validates block identity without redundant hashing | Benchmarks and invariant tests |
-| BL-086 | [ ] | Account history indexes avoid whole-ledger scans | Benchmarks and invariant tests |
-| BL-087 | [ ] | Receivable destination indexes avoid unrelated transfers | Benchmarks and invariant tests |
-| BL-088 | [ ] | Receivable ordering updates incrementally with confirmed state | Benchmarks and invariant tests |
-| BL-089 | [ ] | Page allocations respect requested and byte-bounded limits | Benchmarks and invariant tests |
-| BL-090 | [ ] | Confirmed delegation weights update incrementally | Benchmarks and invariant tests |
-| BL-091 | [ ] | Consensus health reads one consistent ledger status | Benchmarks and invariant tests |
-| BL-092 | [ ] | Work generation reuses fixed-size hashing buffers | Benchmarks and invariant tests |
-| BL-093 | [ ] | Index and allocation regressions compare against reference results | Benchmarks and invariant tests |
+| BL-082 | [x] | Protocol and certificate benchmarks establish reproducible workloads | Benchmarks and invariant tests |
+| BL-083 | [x] | History and receivable benchmarks separate ledger query costs | Benchmarks and invariant tests |
+| BL-084 | [x] | Ledger caches its immutable network identity | Benchmarks and invariant tests |
+| BL-085 | [x] | Ledger validates block identity without redundant hashing | Benchmarks and invariant tests |
+| BL-086 | [x] | Account history indexes avoid whole-ledger scans | Benchmarks and invariant tests |
+| BL-087 | [x] | Receivable destination indexes avoid unrelated transfers | Benchmarks and invariant tests |
+| BL-088 | [x] | Receivable ordering updates incrementally with confirmed state | Benchmarks and invariant tests |
+| BL-089 | [x] | Page allocations respect requested and byte-bounded limits | Benchmarks and invariant tests |
+| BL-090 | [x] | Confirmed delegation weights update incrementally | Benchmarks and invariant tests |
+| BL-091 | [x] | Consensus health reads one consistent ledger status | Benchmarks and invariant tests |
+| BL-092 | [x] | Work generation reuses fixed-size hashing buffers | Benchmarks and invariant tests |
+| BL-093 | [x] | Index and allocation regressions compare against reference results | Benchmarks and invariant tests |
 
 ### Operations
 
