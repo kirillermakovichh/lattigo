@@ -26,12 +26,13 @@ import (
 const maxBody = 1 << 20
 
 type Config struct {
-	Store        *ledger.Store
-	Engine       *consensus.Engine
-	Token        string
-	PublishBlock func(protocol.Block)
-	Syncing      func() bool
-	PeerStats    func() any
+	Store           *ledger.Store
+	Engine          *consensus.Engine
+	Token           string
+	PublishBlock    func(protocol.Block)
+	Syncing         func() bool
+	PeerStats       func() any
+	PeerDiagnostics func() any
 }
 
 type Server struct {
@@ -64,6 +65,7 @@ func (s *Server) Stop() { s.stopOnce.Do(func() { close(s.stopping) }) }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/status", s.status)
+	mux.HandleFunc("GET /v1/admin/peers", s.peers)
 	mux.HandleFunc("GET /v1/genesis", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, s.cfg.Store.Genesis()) })
 	mux.HandleFunc("GET /v1/account", s.account)
 	mux.HandleFunc("GET /v1/receivables", s.receivables)

@@ -55,7 +55,7 @@ func Run(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	api, err := rpc.New(rpc.Config{Store: store, Engine: engine, Token: cfg.RPCToken, Syncing: network.Syncing, PeerStats: network.Stats})
+	api, err := rpc.New(rpc.Config{Store: store, Engine: engine, Token: cfg.RPCToken, Syncing: network.Syncing, PeerStats: network.Stats, PeerDiagnostics: network.Diagnostics})
 	if err != nil {
 		return err
 	}
