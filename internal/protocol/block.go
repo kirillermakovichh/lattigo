@@ -122,13 +122,24 @@ func (b Block) Verify() error {
 	}
 	return nil
 }
+
+const workPayloadSize = len("BL/work/v1") + 32 + 8
+
 func workOK(id []byte, nonce uint64, bits uint8) bool {
+	if len(id) != 32 {
+		return false
+	}
+	var scratch [workPayloadSize]byte
+	copy(scratch[:], "BL/work/v1")
+	copy(scratch[len("BL/work/v1"):], id)
+	return workScratchOK(&scratch, nonce, bits)
+}
+func workScratchOK(scratch *[workPayloadSize]byte, nonce uint64, bits uint8) bool {
 	if bits > 24 {
 		return false
 	}
-	p := append([]byte("BL/work/v1"), id...)
-	p = binary.BigEndian.AppendUint64(p, nonce)
-	h := sha256.Sum256(p)
+	binary.BigEndian.PutUint64(scratch[workPayloadSize-8:], nonce)
+	h := sha256.Sum256(scratch[:])
 	whole := int(bits / 8)
 	for i := 0; i < whole; i++ {
 		if h[i] != 0 {
@@ -150,13 +161,16 @@ func (b *Block) GenerateWork(ctx context.Context, bits uint8) error {
 	if e != nil {
 		return e
 	}
+	var scratch [workPayloadSize]byte
+	copy(scratch[:], "BL/work/v1")
+	copy(scratch[len("BL/work/v1"):], id)
 	for nonce := uint64(0); ; nonce++ {
 		if nonce%1024 == 0 {
 			if e := ctx.Err(); e != nil {
 				return e
 			}
 		}
-		if workOK(id, nonce, bits) {
+		if workScratchOK(&scratch, nonce, bits) {
 			b.Work = nonce
 			return nil
 		}
