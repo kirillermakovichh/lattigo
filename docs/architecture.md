@@ -21,7 +21,14 @@ local wallet and operator CLI. Spending keys never need to enter the node.
 ## Ownership and ordering
 
 Ledger is the sole authority for atomic confirmed transitions. Consensus consumes a
-consistent confirmed view and submits certified records. P2P/RPC never mutate indexes.
+consistent confirmed view and submits certified records. P2P/RPC never mutate indexes. Network identity is cached from the owned immutable
+genesis. Replay and commit update account history heights, sorted destination source
+indexes, per-account owned voting balances and delegated representative totals in the
+same ledger transition. Sending preserves owned weight through outgoing receivables;
+receiving transfers that weight from the source owner, and delegation moves all owned
+weight including outstanding sends. Query pages copy records and weight maps; callers
+cannot mutate retained certificates or indexes. Sorted destination insertion/removal
+is linear in that destination's outstanding transfers; page lookup uses binary search.
 The engine serializes commands and voting state with a mutex. Storage serializes durable
 updates with its own lock. Transport callbacks run after the engine mutex is released.
 Ledger observations atomically capture a confirmed read and a change channel under the
