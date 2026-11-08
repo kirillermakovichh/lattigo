@@ -17,7 +17,7 @@ type PeerDiagnostic struct {
 func (n *Network) Diagnostics() any {
 	rows := make([]PeerDiagnostic, 0, len(n.peers))
 	for _, p := range n.peers {
-		rows = append(rows, PeerDiagnostic{LatencyNanos: p.latency.Load(), LastSuccessUnixNano: p.lastSuccess.Load(), URL: p.url, Connected: p.connected.Load(), Height: p.height.Load(), QueuedBytes: p.queued.Load(), QueuedMessages: len(p.queue), ConsecutiveFailures: p.failures.Load(), RetryAtUnixNano: p.retryAt.Load()})
+		rows = append(rows, PeerDiagnostic{LatencyNanos: p.latency.Load(), LastSuccessUnixNano: p.lastSuccess.Load(), URL: p.url, Connected: p.connected.Load(), Height: p.height.Load(), QueuedBytes: p.queued.Load() + p.priorityBytes.Load(), QueuedMessages: len(p.queue) + len(p.priority), ConsecutiveFailures: p.failures.Load(), RetryAtUnixNano: p.retryAt.Load()})
 	}
 	return rows
 }

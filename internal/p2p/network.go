@@ -37,6 +37,8 @@ type Config struct {
 type peer struct {
 	url           string
 	queue         chan []byte
+	priority      chan []byte
+	priorityBytes atomic.Int64
 	connected     atomic.Bool
 	height        atomic.Uint64
 	queued        atomic.Int64
@@ -123,7 +125,7 @@ func New(cfg Config) (*Network, error) {
 			continue
 		}
 		seen[normalized] = true
-		n.peers = append(n.peers, &peer{url: normalized, queue: make(chan []byte, 32)})
+		n.peers = append(n.peers, &peer{url: normalized, queue: make(chan []byte, 32), priority: make(chan []byte, 16)})
 	}
 	return n, nil
 }
@@ -177,6 +179,19 @@ func (n *Network) Run(ctx context.Context) error {
 			return nil
 		}
 		for _, p := range n.peers {
+			if !bytes.HasPrefix(raw, []byte(`{"type":"block"`)) {
+				if !reserve(&p.priorityBytes, int64(len(raw)), 24<<20) {
+					n.dropped.Add(1)
+					continue
+				}
+				select {
+				case p.priority <- raw:
+				default:
+					p.priorityBytes.Add(-int64(len(raw)))
+					n.dropped.Add(1)
+				}
+				continue
+			}
 			if !reserve(&p.queued, int64(len(raw)), 24<<20) {
 				n.dropped.Add(1)
 				continue
@@ -230,18 +245,54 @@ func (n *Network) runPeer(ctx context.Context, p *peer) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	n.syncPeer(ctx, p)
+	burst := 0
+	deliver := func(raw []byte, priority bool) {
+		if priority {
+			p.priorityBytes.Add(-int64(len(raw)))
+			burst++
+		} else {
+			p.queued.Add(-int64(len(raw)))
+			burst = 0
+		}
+		if time.Now().UnixNano() < p.retryAt.Load() {
+			return
+		}
+		if err := n.request(ctx, p, "POST", "/p2p/message", raw, nil); err != nil {
+			p.connected.Store(false)
+		}
+	}
 	for {
+		if burst >= 4 {
+			select {
+			case raw := <-p.queue:
+				deliver(raw, false)
+				continue
+			default:
+			}
+		}
+		// Prefer priority without excluding synchronization or cancellation indefinitely.
 		select {
 		case <-ctx.Done():
 			return
+		case <-ticker.C:
+			if time.Now().UnixNano() >= p.retryAt.Load() {
+				n.syncPeer(ctx, p)
+			}
+		default:
+		}
+		select {
+		case raw := <-p.priority:
+			deliver(raw, true)
+			continue
+		default:
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case raw := <-p.priority:
+			deliver(raw, true)
 		case raw := <-p.queue:
-			p.queued.Add(-int64(len(raw)))
-			if time.Now().UnixNano() < p.retryAt.Load() {
-				continue
-			}
-			if err := n.request(ctx, p, "POST", "/p2p/message", raw, nil); err != nil {
-				p.connected.Store(false)
-			}
+			deliver(raw, false)
 		case <-ticker.C:
 			if time.Now().UnixNano() >= p.retryAt.Load() {
 				n.syncPeer(ctx, p)
