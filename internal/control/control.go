@@ -32,7 +32,7 @@ func (p *peerFlags) Set(s string) error { *p = append(*p, s); return nil }
 // RunControl executes local network administration and authenticated backup workflows.
 func RunControl(ctx context.Context, args []string, out, errout io.Writer) error {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		_, e := fmt.Fprintln(out, "Usage: blctl <genesis|config|token|status|backup|restore|inspect|verify> [flags]\nUse blctl <command> --help for flags. Runtime secrets are never printed.")
+		_, e := fmt.Fprintln(out, "Usage: blctl <genesis|config|token|status|peers|backup|restore|inspect|verify> [flags]\nUse blctl <command> --help for flags. Runtime secrets are never printed.")
 		return e
 	}
 	cmd := args[0]
@@ -66,7 +66,7 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 		fs.Var(&peers, "peer", "configured peer HTTP origin (repeatable)")
 		fs.BoolVar(&remote, "allow-remote-rpc", false, "explicit remote RPC listener opt-in")
 		fs.StringVar(&output, "out", "node.json", "exclusive private config output")
-	case "status", "backup":
+	case "status", "peers", "backup":
 		fs.StringVar(&rpc, "rpc", "http://127.0.0.1:7070", "RPC origin")
 		fs.StringVar(&tokenFile, "token-file", "", "0600 file containing RPC token; otherwise BL_RPC_TOKEN")
 		fs.DurationVar(&timeout, "timeout", 2*time.Minute, "request deadline")
@@ -195,7 +195,7 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 			return e
 		}
 		return controlOutput(out, map[string]any{"path": output, "status": "created", "rpc_token": "stored in private config; not printed"})
-	case "status", "backup":
+	case "status", "peers", "backup":
 		if timeout <= 0 {
 			return errors.New("timeout must be positive")
 		}
@@ -213,6 +213,13 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 		c, e := client.New(rpc, token)
 		if e != nil {
 			return e
+		}
+		if cmd == "peers" {
+			peers, err := c.Peers(ctx)
+			if err != nil {
+				return err
+			}
+			return controlOutput(out, peers)
 		}
 		if cmd == "status" {
 			s, e := c.Status(ctx)

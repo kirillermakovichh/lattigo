@@ -16,6 +16,7 @@ type Option = transport.Option
 type Error = transport.Error
 type SubmissionError = transport.SubmissionError
 type Status = transport.Status
+type PeerDiagnostic = transport.PeerDiagnostic
 type AccountState = transport.AccountState
 type Receivable = transport.Receivable
 type Submission = transport.Submission
