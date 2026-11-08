@@ -51,17 +51,20 @@ type rate struct {
 	updated time.Time
 }
 type Network struct {
-	cfg      Config
-	peers    []*peer
-	client   *http.Client
-	slots    chan struct{}
-	out      chan []byte
-	stopped  atomic.Bool
-	dropped  atomic.Uint64
-	received atomic.Uint64
-	queued   atomic.Int64
-	mu       sync.Mutex
-	rates    map[string]rate
+	cfg           Config
+	peers         []*peer
+	client        *http.Client
+	slots         chan struct{}
+	out           chan []byte
+	priority      chan []byte
+	priorityBytes atomic.Int64
+	priorityBurst int
+	stopped       atomic.Bool
+	dropped       atomic.Uint64
+	received      atomic.Uint64
+	queued        atomic.Int64
+	mu            sync.Mutex
+	rates         map[string]rate
 }
 
 type peerStatus struct {
@@ -109,7 +112,7 @@ func New(cfg Config) (*Network, error) {
 		return nil, errors.New("configured peers exceed max_peers")
 	}
 	transport := &http.Transport{Proxy: nil, MaxIdleConns: cfg.MaxPeers * 2, MaxIdleConnsPerHost: 2, MaxConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, TLSHandshakeTimeout: 3 * time.Second, ResponseHeaderTimeout: 3 * time.Second, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: 30 * time.Second}).DialContext}
-	n := &Network{cfg: cfg, client: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error { return errors.New("peer redirects are disabled") }}, slots: make(chan struct{}, 16), out: make(chan []byte, 256), rates: make(map[string]rate)}
+	n := &Network{cfg: cfg, client: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error { return errors.New("peer redirects are disabled") }}, slots: make(chan struct{}, 16), out: make(chan []byte, 256), priority: make(chan []byte, 64), rates: make(map[string]rate)}
 	seen := make(map[string]bool)
 	for _, raw := range cfg.Peers {
 		normalized, err := ValidatePeer(raw)
@@ -136,6 +139,19 @@ func (n *Network) Publish(message consensus.Message) {
 		n.dropped.Add(1)
 		return
 	}
+	if message.Type != "block" {
+		if !reserve(&n.priorityBytes, int64(len(raw)), 32<<20) {
+			n.dropped.Add(1)
+			return
+		}
+		select {
+		case n.priority <- raw:
+		default:
+			n.priorityBytes.Add(-int64(len(raw)))
+			n.dropped.Add(1)
+		}
+		return
+	}
 	if !reserve(&n.queued, int64(len(raw)), 32<<20) {
 		n.dropped.Add(1)
 		return
@@ -156,24 +172,57 @@ func (n *Network) Run(ctx context.Context) error {
 	}
 	defer func() { n.stopped.Store(true); wg.Wait(); n.client.CloseIdleConnections() }()
 	for {
-		select {
-		case <-ctx.Done():
+		raw, ok := n.nextOutbound(ctx)
+		if !ok {
 			return nil
-		case raw := <-n.out:
-			n.queued.Add(-int64(len(raw)))
-			for _, p := range n.peers {
-				if !reserve(&p.queued, int64(len(raw)), 24<<20) {
-					n.dropped.Add(1)
-					continue
-				}
-				select {
-				case p.queue <- raw:
-				default:
-					p.queued.Add(-int64(len(raw)))
-					n.dropped.Add(1)
-				}
+		}
+		for _, p := range n.peers {
+			if !reserve(&p.queued, int64(len(raw)), 24<<20) {
+				n.dropped.Add(1)
+				continue
+			}
+			select {
+			case p.queue <- raw:
+			default:
+				p.queued.Add(-int64(len(raw)))
+				n.dropped.Add(1)
 			}
 		}
+	}
+}
+
+// nextOutbound serves at most four priority frames before a waiting ordinary
+// frame. Both classes have independent count and retained-byte budgets.
+func (n *Network) nextOutbound(ctx context.Context) ([]byte, bool) {
+	take := func(raw []byte, priority bool) ([]byte, bool) {
+		if priority {
+			n.priorityBytes.Add(-int64(len(raw)))
+			n.priorityBurst++
+		} else {
+			n.queued.Add(-int64(len(raw)))
+			n.priorityBurst = 0
+		}
+		return raw, true
+	}
+	if n.priorityBurst >= 4 {
+		select {
+		case raw := <-n.out:
+			return take(raw, false)
+		default:
+		}
+	}
+	select {
+	case raw := <-n.priority:
+		return take(raw, true)
+	default:
+	}
+	select {
+	case <-ctx.Done():
+		return nil, false
+	case raw := <-n.priority:
+		return take(raw, true)
+	case raw := <-n.out:
+		return take(raw, false)
 	}
 }
 
