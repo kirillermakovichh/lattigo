@@ -43,6 +43,8 @@ type peer struct {
 	pendingCursor int
 	failures      atomic.Uint64
 	retryAt       atomic.Int64
+	latency       atomic.Int64
+	lastSuccess   atomic.Int64
 }
 type rate struct {
 	tokens  float64
@@ -200,13 +202,16 @@ func (n *Network) runPeer(ctx context.Context, p *peer) {
 }
 
 func (n *Network) request(ctx context.Context, p *peer, method, path string, body []byte, result any) (requestErr error) {
+	started := time.Now()
 	defer func() {
+		p.latency.Store(time.Since(started).Nanoseconds())
 		if requestErr != nil {
 			attempt := p.failures.Add(1) - 1
 			p.retryAt.Store(time.Now().Add(retryDelay(p.url, attempt)).UnixNano())
 			p.connected.Store(false)
 		} else {
 			p.failures.Store(0)
+			p.lastSuccess.Store(time.Now().UnixNano())
 			p.retryAt.Store(0)
 		}
 	}()

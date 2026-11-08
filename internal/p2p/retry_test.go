@@ -35,7 +35,7 @@ func TestPeerRequestRetryState(t *testing.T) {
 	n.client.Transport = peerTransport(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"X-Bl-Network": {string(n.cfg.Store.Status().Network)}, "X-Bl-Version": {"1"}}, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})
-	if err := n.request(context.Background(), p, "GET", "/p2p/status", nil, nil); err != nil || p.failures.Load() != 0 || p.retryAt.Load() != 0 {
+	if err := n.request(context.Background(), p, "GET", "/p2p/status", nil, nil); err != nil || p.failures.Load() != 0 || p.retryAt.Load() != 0 || p.lastSuccess.Load() == 0 || p.latency.Load() <= 0 {
 		t.Fatal("success did not reset retry", err)
 	}
 }

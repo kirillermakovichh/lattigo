@@ -6,6 +6,8 @@ import (
 )
 
 type PeerDiagnostic struct {
+	LatencyNanos        int64  `json:"latency_nanos"`
+	LastSuccessUnixNano int64  `json:"last_success_unix_nano"`
 	URL                 string `json:"url"`
 	Connected           bool   `json:"connected"`
 	Height              uint64 `json:"height"`
