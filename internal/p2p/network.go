@@ -67,6 +67,8 @@ type Network struct {
 	queued        atomic.Int64
 	mu            sync.Mutex
 	rates         map[string]rate
+	outbound      burstCache
+	deduplicated  atomic.Uint64
 }
 
 type peerStatus struct {
@@ -141,7 +143,10 @@ func (n *Network) Publish(message consensus.Message) {
 		n.dropped.Add(1)
 		return
 	}
-	if message.Type != "block" {
+	if n.duplicateOutbound(raw) {
+		return
+	}
+	if priorityMessage(message.Type) {
 		if !reserve(&n.priorityBytes, int64(len(raw)), 32<<20) {
 			n.dropped.Add(1)
 			return
@@ -179,7 +184,7 @@ func (n *Network) Run(ctx context.Context) error {
 			return nil
 		}
 		for _, p := range n.peers {
-			if !bytes.HasPrefix(raw, []byte(`{"type":"block"`)) {
+			if priorityFrame(raw) {
 				if !reserve(&p.priorityBytes, int64(len(raw)), 24<<20) {
 					n.dropped.Add(1)
 					continue

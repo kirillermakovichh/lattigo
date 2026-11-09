@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"context"
 	"example.com/go-block-lattice/internal/consensus"
 	"testing"
@@ -9,7 +10,7 @@ import (
 func TestGlobalPriorityAdmissionAndFairness(t *testing.T) {
 	n := branchNetwork(t)
 	for i := 0; i < 5; i++ {
-		n.Publish(consensus.Message{Type: "vote"})
+		n.Publish(consensus.Message{Type: "vote", Proposal: &consensus.Proposal{Round: uint32(i)}})
 	}
 	n.Publish(consensus.Message{Type: "block"})
 	if len(n.priority) != 5 || len(n.out) != 1 {
@@ -17,7 +18,7 @@ func TestGlobalPriorityAdmissionAndFairness(t *testing.T) {
 	}
 	for i := 0; i < 4; i++ {
 		raw, ok := n.nextOutbound(context.Background())
-		if !ok || string(raw) != "{\"type\":\"vote\"}" {
+		if !ok || !bytes.HasPrefix(raw, []byte(`{"type":"vote"`)) {
 			t.Fatal(string(raw))
 		}
 	}

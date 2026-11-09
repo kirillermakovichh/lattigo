@@ -164,7 +164,7 @@ func TestPeerTransportAndQueueBranches(t *testing.T) {
 		t.Fatal("failed peer reported connected")
 	}
 	for i := 0; i < 300; i++ {
-		n.Publish(consensus.Message{Type: "unknown"})
+		n.Publish(consensus.Message{Type: fmt.Sprintf("unknown-%d", i)})
 	}
 	if len(n.out) != 256 || n.dropped.Load() == 0 {
 		t.Fatal("item queue budget ignored")
@@ -311,7 +311,7 @@ func TestPeerFanoutShedsFullItemAndByteQueues(t *testing.T) {
 		}
 	}
 	for i := 0; i < 3; i++ {
-		n.Publish(consensus.Message{Type: "unknown"})
+		n.Publish(consensus.Message{Type: fmt.Sprintf("unknown-%d", i)})
 	}
 	deadline := time.After(time.Second)
 	for n.dropped.Load() < 5 {
