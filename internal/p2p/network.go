@@ -4,6 +4,7 @@ package p2p
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,6 +69,7 @@ type Network struct {
 	mu            sync.Mutex
 	rates         map[string]rate
 	outbound      burstCache
+	inbound       burstCache
 	deduplicated  atomic.Uint64
 }
 
@@ -585,10 +587,22 @@ func (n *Network) message(w http.ResponseWriter, r *http.Request) {
 		respond(w, 400, map[string]string{"error": "trailing JSON value"})
 		return
 	}
+	canonical, err := json.Marshal(message)
+	if err != nil {
+		respond(w, 400, map[string]string{"error": "cannot encode message"})
+		return
+	}
+	key := sha256.Sum256(canonical)
+	if n.inbound.contains(key, time.Now()) {
+		n.deduplicated.Add(1)
+		respond(w, 202, map[string]bool{"accepted": true})
+		return
+	}
 	if err := n.cfg.Engine.Handle(message); err != nil {
 		respond(w, 400, map[string]string{"error": err.Error()})
 		return
 	}
+	n.inbound.remember(key, time.Now())
 	n.received.Add(1)
 	respond(w, 202, map[string]bool{"accepted": true})
 }
