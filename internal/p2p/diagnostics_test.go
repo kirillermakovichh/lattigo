@@ -18,3 +18,22 @@ func TestDiagnosticsSnapshotsConfiguredPeers(t *testing.T) {
 		t.Fatal("diagnostics alias state")
 	}
 }
+
+func TestAggregateMetricsIncludeBothQueueClasses(t *testing.T) {
+	n := branchNetwork(t)
+	n.queued.Store(3)
+	n.priorityBytes.Store(5)
+	p := &peer{queue: make(chan []byte, 1), priority: make(chan []byte, 1)}
+	p.queued.Store(7)
+	p.priorityBytes.Store(11)
+	n.peers = []*peer{p}
+	metrics := n.Stats().(map[string]any)
+	if metrics["queued_bytes"] != 26 || metrics["queue_item_budget"] != 368 || metrics["queue_byte_budget"] != int(112<<20) {
+		t.Fatal(metrics)
+	}
+	for key := range metrics {
+		if key == p.url {
+			t.Fatal("identity metric label")
+		}
+	}
+}

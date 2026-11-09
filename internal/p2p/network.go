@@ -445,11 +445,17 @@ func (n *Network) Stats() any {
 			connected++
 		}
 	}
-	queued := n.queued.Load()
+	queued := n.queued.Load() + n.priorityBytes.Load()
+	messages := len(n.out) + len(n.priority)
+	retrying := 0
 	for _, p := range n.peers {
-		queued += p.queued.Load()
+		queued += p.queued.Load() + p.priorityBytes.Load()
+		messages += len(p.queue) + len(p.priority)
+		if p.retryAt.Load() > time.Now().UnixNano() {
+			retrying++
+		}
 	}
-	return map[string]any{"peers": len(n.peers), "connected": connected, "dropped": int(n.dropped.Load()), "received": int(n.received.Load()), "queued_bytes": int(queued)}
+	return map[string]any{"peers": len(n.peers), "connected": connected, "dropped": int(n.dropped.Load()), "received": int(n.received.Load()), "queued_bytes": int(queued), "queued_messages": messages, "retrying": retrying, "deduplicated": int(n.deduplicated.Load()), "queue_byte_budget": int(64<<20) + len(n.peers)*int(48<<20), "queue_item_budget": 320 + len(n.peers)*48}
 }
 
 func (n *Network) allow(remote string) bool {

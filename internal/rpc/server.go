@@ -347,7 +347,7 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.PeerStats != nil {
 		stats := s.cfg.PeerStats()
 		if value, ok := stats.(map[string]any); ok {
-			for _, name := range []string{"peers", "connected", "dropped", "received", "queued_bytes"} {
+			for _, name := range []string{"peers", "connected", "dropped", "received", "queued_bytes", "queued_messages", "retrying", "deduplicated", "queue_byte_budget", "queue_item_budget"} {
 				if n, ok := value[name].(int); ok {
 					_, _ = fmt.Fprintf(w, "bl_p2p_%s %d\n", name, n)
 				}
