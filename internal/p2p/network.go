@@ -494,6 +494,7 @@ func (n *Network) allow(remote string) bool {
 
 func (n *Network) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /p2p/capabilities", n.capabilities)
 	mux.HandleFunc("GET /p2p/status", func(w http.ResponseWriter, r *http.Request) {
 		state := n.cfg.Store.Status()
 		peers := make([]string, 0, len(n.peers))

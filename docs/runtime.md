@@ -193,3 +193,29 @@ Event filters accept `address=ADDRESS` for account-chain events, or additionally
 `checkpoint` frames containing only height and the durable ID; the SDK advances
 its resume position without invoking the payment callback. This avoids replaying
 nonmatching tails after reconnect. Incoming requires an explicit address.
+## Peer delivery and diagnostics
+
+`GET /p2p/capabilities` uses the same network/version headers and bounded admission
+as other peer routes. It advertises HTTP JSON, message/response limits and certified
+page limits without changing the strict protocol1 status object.
+
+Consensus votes, proposals and commits have independent priority queues. Global
+ordinary/priority admission is 256/64 frames and32MiB each; each configured peer
+has32/16 frames and24MiB per class. Workers prefer priority but serve a waiting
+ordinary frame after four priority frames. A slow peer has its own worker and cannot
+block healthy peers. Overflow sheds best-effort gossip; certified synchronization
+and pending-block retransmission remain the repair paths.
+
+Unavailable peers use deterministic per-origin exponential jitter from250ms to
+less than24s. Workers suppress attempts until the retry deadline; successful
+responses reset failure state. Periodic synchronization remains bounded to one
+worker per configured peer. Exact accepted message bursts are deduplicated for250ms
+with at most2048 SHA-256 entries per direction. Rejected inbound messages are never
+cached, and expired entries allow periodic repair.
+
+`blctl peers --rpc ORIGIN --token-file PATH` queries `GET /v1/admin/peers` with bearer
+authorization. It reports configured origins, connectivity, confirmed height, queue
+counts/bytes, consecutive failures, retry deadline, latest response duration and
+last successful response time. These are local observations, not proofs of peer
+health. Metrics expose aggregate queue budgets, retrying peers and deduplication
+counts without peer identity labels.
