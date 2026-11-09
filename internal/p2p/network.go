@@ -315,7 +315,6 @@ func (n *Network) request(ctx context.Context, p *peer, method, path string, bod
 		if requestErr != nil {
 			attempt := p.failures.Add(1) - 1
 			p.retryAt.Store(time.Now().Add(retryDelay(p.url, attempt)).UnixNano())
-			p.connected.Store(false)
 		} else {
 			p.failures.Store(0)
 			p.lastSuccess.Store(time.Now().UnixNano())
