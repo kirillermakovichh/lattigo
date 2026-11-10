@@ -25,6 +25,7 @@ func main() {
 func run(args []string) error {
 	flags := flag.NewFlagSet("blnode", flag.ContinueOnError)
 	config := flags.String("config", "", "path to node JSON configuration")
+	validate := flags.Bool("validate-config", false, "validate configuration and inputs without starting the node")
 	showVersion := flags.Bool("version", false, "print binary version")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -45,6 +46,13 @@ func run(args []string) error {
 	cfg, err := node.LoadConfig(*config)
 	if err != nil {
 		return err
+	}
+	if *validate {
+		if err := cfg.ValidateFiles(); err != nil {
+			return err
+		}
+		fmt.Println("configuration valid")
+		return nil
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
