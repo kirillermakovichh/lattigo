@@ -46,3 +46,11 @@ existing valid ledger. Raising serialized limits also raises memory requirements
 Run the service as an unprivileged user with an owner-only data directory. Use a service
 manager to supervise blnode --config /absolute/path/node.json and deliver SIGTERM.
 Keep RPC on loopback unless explicitly enabling a secured remote deployment.
+
+## Startup preflight
+
+`blnode --config node.json --validate-config` validates configuration, genesis and
+representative-key inputs without opening storage or listeners. `blctl doctor
+--config node.json` emits a redacted local summary: listener addresses, configured
+capacity and boolean authentication/representative state. It never prints token
+values, key paths or data-directory paths. Neither command proves live readiness.
