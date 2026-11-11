@@ -83,3 +83,8 @@ representative keys and tokens. Do not weaken key-file permissions to make a hos
 user's seed readable. The pre-start command validates inputs without opening the
 ledger. Stop allows30seconds for the node's owned shutdown. Review resource limits
 against your deployment workload; they do not establish hardware qualification.
+
+`blctl ready --rpc http://127.0.0.1:7070 --timeout 5s` prints the current readiness
+body and exits nonzero when admission is unavailable. The Go client `Readiness`
+method returns `Ready=false` for a valid503 readiness response; malformed bodies,
+status/body contradictions and transport failures return errors.

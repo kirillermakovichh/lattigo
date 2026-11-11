@@ -74,3 +74,37 @@ func runProfile(ctx context.Context, args []string, out, errout io.Writer) error
 	}
 	return controlOutput(out, map[string]any{"path": *output, "kind": *kind, "status": "complete"})
 }
+
+func runReady(ctx context.Context, args []string, out, errout io.Writer) error {
+	fs := flag.NewFlagSet("ready", flag.ContinueOnError)
+	fs.SetOutput(errout)
+	rpc := fs.String("rpc", "http://127.0.0.1:7070", "RPC origin")
+	timeout := fs.Duration("timeout", 5*time.Second, "probe deadline")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+	if fs.NArg() != 0 || *timeout <= 0 {
+		return errors.New("ready requires positive timeout and no positional arguments")
+	}
+	c, err := client.New(*rpc, "")
+	if err != nil {
+		return err
+	}
+	defer c.CloseIdleConnections()
+	ctx, cancel := context.WithTimeout(ctx, *timeout)
+	defer cancel()
+	ready, err := c.Readiness(ctx)
+	if err != nil {
+		return err
+	}
+	if err := controlOutput(out, ready); err != nil {
+		return err
+	}
+	if !ready.Ready {
+		return errors.New("node is not ready")
+	}
+	return nil
+}

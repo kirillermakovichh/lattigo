@@ -15,6 +15,7 @@ type Client = transport.Client
 type Option = transport.Option
 type Error = transport.Error
 type SubmissionError = transport.SubmissionError
+type Readiness = transport.Readiness
 type Status = transport.Status
 type PeerDiagnostic = transport.PeerDiagnostic
 type AccountState = transport.AccountState
