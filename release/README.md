@@ -17,3 +17,8 @@ The manifest's exact Go toolchain string makes differing toolchains visible.
 Verify checksums before extraction. `blnode --version`, `blwallet --version` and
 `blctl --version` report the packaged version and source revision.
 A reproducible archive is not evidence that all release gates in docs/quality.md pass.
+
+`provenance.json` records the committed source tree, toolchain, target, deterministic
+build flags and SHA-256 of each executable inside the archive. Reproduction can
+compare those subjects before comparing the archive checksum. This local metadata
+is unsigned and is not a third-party build attestation.

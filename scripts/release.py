@@ -20,6 +20,17 @@ def run(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
 
+def provenance(stage, version, commit, tree, epoch, toolchain, goos, goarch):
+    """Deterministic build inputs and subjects; this is metadata, not attestation."""
+    return {"schema_version": 1, "source": {"commit": commit, "tree": tree},
+            "version": version, "source_date_epoch": epoch,
+            "builder": {"toolchain": toolchain, "goos": goos, "goarch": goarch,
+                        "cgo_enabled": False, "trimpath": True, "buildvcs": False,
+                        "ldflags": "-s -w -buildid= -X main.version=" + version + "+" + commit[:12]},
+            "subjects": [{"name": name, "sha256": hashlib.sha256((stage / name).read_bytes()).hexdigest()}
+                         for name in ("blnode", "blwallet", "blctl")]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
@@ -28,6 +39,7 @@ def main():
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}", args.version):
         parser.error("version must be a safe 1..64 character identifier")
     commit = run("git", "rev-parse", "HEAD")
+    tree = run("git", "rev-parse", "HEAD^{tree}")
     if run("git", "status", "--porcelain"):
         parser.error("commit the complete source tree before packaging")
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", run("git", "show", "-s", "--format=%ct", "HEAD")))
@@ -66,6 +78,8 @@ def main():
                         "go": run("go", "version"), "goos": goos, "goarch": goarch,
                         "cgo": False, "external_runtime_dependencies": [], "protocol_version": 1}
             (stage / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            (stage / "provenance.json").write_text(json.dumps(provenance(stage, args.version, commit, tree, epoch,
+                manifest["go"], goos, goarch), indent=2, sort_keys=True) + "\n")
             archive = out / f"{stem}.tar.gz"
             with archive.open("wb") as raw:
                 with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=epoch) as zipped:
