@@ -219,3 +219,11 @@ counts/bytes, consecutive failures, retry deadline, latest response duration and
 last successful response time. These are local observations, not proofs of peer
 health. Metrics expose aggregate queue budgets, retrying peers and deduplication
 counts without peer identity labels.
+### Bounded operator profiles
+
+`GET /v1/admin/profile?kind=heap|goroutine|cpu` requires the configured bearer token.
+CPU collection accepts `seconds=1..5` (default1); other profiles reject that field.
+One collection per RPC server and at most16MiB of compressed profile bytes are
+retained. Concurrent requests receive503. CPU collection stops on cancellation or
+node shutdown. Profiles can contain sensitive runtime data; keep downloads private.
+No default Go profiling mux is exposed.

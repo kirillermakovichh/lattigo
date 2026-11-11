@@ -36,16 +36,17 @@ type Config struct {
 }
 
 type Server struct {
-	stopping   chan struct{}
-	stopOnce   sync.Once
-	cursors    cursorCodec
-	cfg        Config
-	slots      chan struct{}
-	backupSlot chan struct{}
-	eventSlots chan struct{}
-	waitSlots  chan struct{}
-	requests   atomic.Uint64
-	rejected   atomic.Uint64
+	stopping     chan struct{}
+	stopOnce     sync.Once
+	cursors      cursorCodec
+	cfg          Config
+	slots        chan struct{}
+	backupSlot   chan struct{}
+	profileSlots chan struct{}
+	eventSlots   chan struct{}
+	waitSlots    chan struct{}
+	requests     atomic.Uint64
+	rejected     atomic.Uint64
 }
 
 func New(cfg Config) (*Server, error) {
@@ -56,7 +57,8 @@ func New(cfg Config) (*Server, error) {
 	if _, err := rand.Read(key[:]); err != nil {
 		return nil, err
 	}
-	return &Server{cfg: cfg, stopping: make(chan struct{}), cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1), waitSlots: make(chan struct{}, 8), eventSlots: make(chan struct{}, 8)}, nil
+	return &Server{cfg: cfg, stopping: make(chan struct{}), cursors: key, slots: make(chan struct{}, 32), backupSlot: make(chan struct{}, 1), waitSlots: make(chan struct{}, 8), eventSlots: make(chan struct{}, 8), profileSlots: make(chan struct{}, 1)}, nil
+
 }
 
 // Stop releases long-lived readers without closing shared ledger state.
@@ -78,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/blocks", s.submit)
 	mux.HandleFunc("POST /v1/query", s.batchRead)
 	mux.HandleFunc("GET /v1/admin/backup", s.backup)
+	mux.HandleFunc("GET /v1/admin/profile", s.profile)
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"live": true})
 	})
