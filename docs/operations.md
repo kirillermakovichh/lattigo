@@ -54,3 +54,9 @@ representative-key inputs without opening storage or listeners. `blctl doctor
 --config node.json` emits a redacted local summary: listener addresses, configured
 capacity and boolean authentication/representative state. It never prints token
 values, key paths or data-directory paths. Neither command proves live readiness.
+
+`blctl profile --rpc http://127.0.0.1:7070 --kind heap --out heap.pprof`
+downloads an authenticated profile to an exclusive0600 file. Use `--kind cpu
+--seconds 5` for a bounded CPU sample and `go tool pprof heap.pprof` to inspect.
+Failed or oversized downloads do not publish the destination; existing files are
+never overwritten. The default download deadline is15seconds.
