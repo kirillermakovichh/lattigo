@@ -1,0 +1,9 @@
+*
+!go.mod
+!Dockerfile
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+**/*_test.go
+**/testdata/

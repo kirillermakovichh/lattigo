@@ -60,3 +60,14 @@ downloads an authenticated profile to an exclusive0600 file. Use `--kind cpu
 --seconds 5` for a bounded CPU sample and `go tool pprof heap.pprof` to inspect.
 Failed or oversized downloads do not publish the destination; existing files are
 never overwritten. The default download deadline is15seconds.
+
+## Container execution
+
+Build with `docker build -t block-lattice:local .`. The multi-stage image contains
+only the static node and CA roots and runs as UID/GID65532. Mount an explicit
+read-only configuration directory at `/config` and a writable private data directory
+at `/data`, owned by65532. Representative seeds and configuration are mounted at
+runtime, never copied into the build context. Set `data_dir` to `/data`.
+Use `--read-only --cap-drop ALL --security-opt no-new-privileges` and publish only
+required listeners. Remote RPC still requires explicit configuration opt-in and a
+strong token. Pin base image digests in your deployment's supply-chain policy.
