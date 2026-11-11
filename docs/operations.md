@@ -71,3 +71,15 @@ runtime, never copied into the build context. Set `data_dir` to `/data`.
 Use `--read-only --cap-drop ALL --security-opt no-new-privileges` and publish only
 required listeners. Remote RPC still requires explicit configuration opt-in and a
 strong token. Pin base image digests in your deployment's supply-chain policy.
+
+## Systemd execution
+
+`deploy/systemd/blnode.service` uses a dynamic unprivileged identity, a private
+`StateDirectory`, a strict read-only filesystem, no capabilities and bounded file
+and task counts. Install the binary at `/usr/local/bin/blnode` and configuration at
+`/etc/block-lattice/node.json`; set `data_dir` to `/var/lib/block-lattice`.
+Use systemd credentials or an appropriately restricted service-readable mount for
+representative keys and tokens. Do not weaken key-file permissions to make a host
+user's seed readable. The pre-start command validates inputs without opening the
+ledger. Stop allows30seconds for the node's owned shutdown. Review resource limits
+against your deployment workload; they do not establish hardware qualification.

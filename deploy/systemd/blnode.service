@@ -1,0 +1,38 @@
+[Unit]
+Description=Block Lattice payment node
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=block-lattice
+WorkingDirectory=/var/lib/block-lattice
+ExecStartPre=/usr/local/bin/blnode --config /etc/block-lattice/node.json --validate-config
+ExecStart=/usr/local/bin/blnode --config /etc/block-lattice/node.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+LimitNOFILE=4096
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target
