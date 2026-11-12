@@ -33,7 +33,9 @@ def main():
     if not shutil.which("docker"):
         parser.exit(2, "Docker CLI unavailable; container smoke was not run.\n")
     try:
-        command("docker", "info", "--format", "{{.ServerVersion}}", timeout=10)
+        version = command("docker", "info", "--format", "{{.ServerVersion}}", timeout=10)
+        if not version:
+            parser.exit(2, "Docker daemon unavailable; container smoke was not run.\n")
     except (subprocess.SubprocessError, OSError):
         parser.exit(2, "Docker daemon unavailable; container smoke was not run.\n")
     name = "bl-smoke-" + secrets.token_hex(8)
