@@ -88,3 +88,11 @@ against your deployment workload; they do not establish hardware qualification.
 body and exits nonzero when admission is unavailable. The Go client `Readiness`
 method returns `Ready=false` for a valid503 readiness response; malformed bodies,
 status/body contradictions and transport failures return errors.
+
+`blctl doctor --config node.json --live --timeout 5s` additionally probes the local
+RPC status/readiness and opens a TCP connection to the configured P2P listener.
+Wildcard listeners map to loopback for these probes. Output includes current
+height, history bytes/limit, capacity, syncing and observed quorum. The P2P check
+proves listener reachability only; it does not authenticate peers or prove quorum.
+Offline doctor performs no network operations. Probe failures return nonzero with
+redacted errors and any already collected diagnostics.
