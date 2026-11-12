@@ -96,3 +96,12 @@ height, history bytes/limit, capacity, syncing and observed quorum. The P2P chec
 proves listener reachability only; it does not authenticate peers or prove quorum.
 Offline doctor performs no network operations. Probe failures return nonzero with
 redacted errors and any already collected diagnostics.
+
+Run `python3 tests/container_smoke.py --binary-dir bin` after building host CLIs.
+The tool checks Docker availability before creating anything, builds a temporary
+image, generates a new wallet/genesis in a private temporary directory and starts
+one randomly named container with read-only root/config, dropped capabilities and
+a bounded64MiB tmpfs data mount. It checks unprivileged image identity, reads the
+ledger and verifies clean shutdown. Cleanup targets only its own container/image;
+`--image existing-tag` retains the supplied image. No Docker daemon means an
+explicit nonzero unavailable result, never a passing smoke claim.
