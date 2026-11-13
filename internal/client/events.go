@@ -145,7 +145,7 @@ func parseEvents(ctx context.Context, source io.Reader, options EventOptions, co
 				continue
 			}
 			height, err := event.ParseID(id, options.Network)
-			if err != nil || height <= previous || (kind != "confirmed" && kind != "checkpoint") {
+			if err != nil || height == 0 || height != previous+1 || (kind != "confirmed" && kind != "checkpoint") {
 				return last, fmt.Errorf("%w: event scope or order", ErrEventProtocol)
 			}
 			var record struct {

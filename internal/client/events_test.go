@@ -83,3 +83,13 @@ func TestFilteredCheckpointsResumeWithoutFinancialCallback(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEventParserRequiresContiguousDurableHeights(t *testing.T) {
+	options, first := eventFixture(t, 1)
+	_, third := eventFixture(t, 3)
+	delivered := 0
+	last, err := parseEvents(context.Background(), strings.NewReader(first+third), options, func(Event) error { delivered++; return nil })
+	if !errors.Is(err, ErrEventProtocol) || delivered != 1 || last != event.ID(options.Network, 1) {
+		t.Fatal(last, delivered, err)
+	}
+}
