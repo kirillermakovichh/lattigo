@@ -14,7 +14,7 @@ import (
 	"example.com/go-block-lattice/internal/protocol"
 )
 
-func eventFixture(t *testing.T, height uint64) (EventOptions, string) {
+func eventFixture(t testing.TB, height uint64) (EventOptions, string) {
 	t.Helper()
 	key := ed25519.NewKeyFromSeed(make([]byte, 32))
 	network := protocol.Digest([]byte("events"))

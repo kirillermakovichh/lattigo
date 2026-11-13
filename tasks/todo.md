@@ -426,18 +426,18 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
-| BL-070 | [ ] | Peer retry delay uses bounded reproducible jitter | Focused Go tests and race checks |
-| BL-071 | [ ] | Peer workers back off failures and reset after success | Focused Go tests and race checks |
-| BL-072 | [ ] | Peer diagnostics expose bounded connection and queue state | Focused Go tests and race checks |
-| BL-073 | [ ] | Operator peers command queries authenticated diagnostics | Focused Go tests and race checks |
-| BL-074 | [ ] | Peer diagnostics record response latency and last success | Focused Go tests and race checks |
-| BL-075 | [ ] | Outbound consensus messages receive bounded priority admission | Focused Go tests and race checks |
-| BL-076 | [ ] | Per-peer delivery preserves priority and ordinary message fairness | Focused Go tests and race checks |
-| BL-077 | [ ] | Outbound burst deduplication retains periodic repair | Focused Go tests and race checks |
-| BL-078 | [ ] | Accepted inbound duplicates avoid repeated verification work | Focused Go tests and race checks |
-| BL-079 | [ ] | Peer metrics expose queue and retry budgets without identity labels | Focused Go tests and race checks |
-| BL-080 | [ ] | Slow-peer fairness and retry recovery are exercised | Focused Go tests and race checks |
-| BL-081 | [ ] | Peer capability endpoint declares supported bounded transports | Focused Go tests and race checks |
+| BL-070 | [x] | Peer retry delay uses bounded reproducible jitter | Focused Go tests and race checks |
+| BL-071 | [x] | Peer workers back off failures and reset after success | Focused Go tests and race checks |
+| BL-072 | [x] | Peer diagnostics expose bounded connection and queue state | Focused Go tests and race checks |
+| BL-073 | [x] | Operator peers command queries authenticated diagnostics | Focused Go tests and race checks |
+| BL-074 | [x] | Peer diagnostics record response latency and last success | Focused Go tests and race checks |
+| BL-075 | [x] | Outbound consensus messages receive bounded priority admission | Focused Go tests and race checks |
+| BL-076 | [x] | Per-peer delivery preserves priority and ordinary message fairness | Focused Go tests and race checks |
+| BL-077 | [x] | Outbound burst deduplication retains periodic repair | Focused Go tests and race checks |
+| BL-078 | [x] | Accepted inbound duplicates avoid repeated verification work | Focused Go tests and race checks |
+| BL-079 | [x] | Peer metrics expose queue and retry budgets without identity labels | Focused Go tests and race checks |
+| BL-080 | [x] | Slow-peer fairness and retry recovery are exercised | Focused Go tests and race checks |
+| BL-081 | [x] | Peer capability endpoint declares supported bounded transports | Focused Go tests and race checks |
 
 ### Performance
 
@@ -460,16 +460,16 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
-| BL-094 | [ ] | Node validates configuration without creating runtime state | Focused Go tests and race checks |
-| BL-095 | [ ] | Operator doctor emits redacted local diagnostics | Focused Go tests and race checks |
-| BL-096 | [ ] | Authenticated profiles bound collection time and retained bytes | Focused Go tests and race checks |
-| BL-097 | [ ] | Operator profile command writes bounded private downloads | Focused Go tests and race checks |
-| BL-098 | [ ] | Container image runs the node as an unprivileged user | Owned process scenario and cleanup checks |
-| BL-099 | [ ] | Systemd service declares filesystem and process restrictions | Owned process scenario and cleanup checks |
-| BL-100 | [ ] | Release archives include reproducible build provenance | Focused Go tests and race checks |
-| BL-101 | [ ] | Client and operator expose readiness probes | Focused Go tests and race checks |
-| BL-102 | [ ] | Live doctor checks listeners and runtime capacity explicitly | Focused Go tests and race checks |
-| BL-103 | [ ] | Container smoke tooling owns and cleans its generated runtime | Owned process scenario and cleanup checks |
+| BL-094 | [x] | Node validates configuration without creating runtime state | Focused Go tests and race checks |
+| BL-095 | [x] | Operator doctor emits redacted local diagnostics | Focused Go tests and race checks |
+| BL-096 | [x] | Authenticated profiles bound collection time and retained bytes | Focused Go tests and race checks |
+| BL-097 | [x] | Operator profile command writes bounded private downloads | Focused Go tests and race checks |
+| BL-098 | [x] | Container image runs the node as an unprivileged user | Owned process scenario and cleanup checks |
+| BL-099 | [x] | Systemd service declares filesystem and process restrictions | Owned process scenario and cleanup checks |
+| BL-100 | [x] | Release archives include reproducible build provenance | Focused Go tests and race checks |
+| BL-101 | [x] | Client and operator expose readiness probes | Focused Go tests and race checks |
+| BL-102 | [x] | Live doctor checks listeners and runtime capacity explicitly | Focused Go tests and race checks |
+| BL-103 | [x] | Container smoke tooling owns and cleans its generated runtime | Owned process scenario and cleanup checks |
 
 ### Resilience
 
@@ -485,9 +485,9 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-111 | [ ] | Quorum loss changes readiness while preserving confirmed reads | Focused Go tests and race checks |
 | BL-112 | [ ] | Concurrent wallet processes preserve account exclusion | Owned process scenario and cleanup checks |
 | BL-113 | [ ] | Process event reconnection resumes without missing confirmed records | Owned process scenario and cleanup checks |
-| BL-114 | [ ] | Payment request fuzzing bounds parsing and canonicalization | Seed tests and bounded fuzz campaign |
-| BL-115 | [ ] | Cursor fuzzing bounds malformed continuation input | Seed tests and bounded fuzz campaign |
-| BL-116 | [ ] | Event parser fuzzing bounds partial and oversized frames | Seed tests and bounded fuzz campaign |
-| BL-117 | [ ] | Randomized index checks preserve transfer and weight invariants | Focused Go tests and race checks |
-| BL-118 | [ ] | Process interruption checks journal and signing recovery | Owned process scenario and cleanup checks |
+| BL-114 | [x] | Payment request fuzzing bounds parsing and canonicalization | Seed tests and bounded fuzz campaign |
+| BL-115 | [x] | Cursor fuzzing bounds malformed continuation input | Seed tests and bounded fuzz campaign |
+| BL-116 | [x] | Event parser fuzzing bounds partial and oversized frames | Seed tests and bounded fuzz campaign |
+| BL-117 | [x] | Randomized index checks preserve transfer and weight invariants | Focused Go tests and race checks |
+| BL-118 | [x] | Process interruption checks journal and signing recovery | Owned process scenario and cleanup checks |
 | BL-119 | [ ] | Packaged extended workflows pass the complete development gates | Owned process scenario and cleanup checks |
