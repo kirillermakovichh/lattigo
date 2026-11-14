@@ -36,7 +36,9 @@ func (w *eventWriter) FlushError() error {
 	return nil
 }
 func (w *eventWriter) SetWriteDeadline(deadline time.Time) error {
-	w.deadline = deadline
+	if !deadline.IsZero() {
+		w.deadline = deadline
+	}
 	if w.failDeadline {
 		return errors.New("deadline")
 	}
@@ -70,5 +72,27 @@ func TestEventWritesHaveIndependentDeadlines(t *testing.T) {
 				t.Fatal("oversized frame published")
 			}
 		})
+	}
+}
+
+type idleDeadlineWriter struct {
+	eventWriter
+	active time.Time
+}
+
+func (w *idleDeadlineWriter) SetWriteDeadline(deadline time.Time) error {
+	w.active = deadline
+	return w.eventWriter.SetWriteDeadline(deadline)
+}
+func TestEventFrameClearsIdleStreamDeadline(t *testing.T) {
+	writer := &idleDeadlineWriter{}
+	if err := writeEvent(writer, http.NewResponseController(writer), "position", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if !writer.active.IsZero() {
+		t.Fatal("idle HTTP/2 stream retains write deadline")
+	}
+	if writer.deadline.IsZero() {
+		t.Fatal("frame had no write deadline")
 	}
 }

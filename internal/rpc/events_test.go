@@ -126,3 +126,39 @@ func TestIncomingEventFilterAdvancesCheckpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestIdleHTTP2EventsRemainOpenBetweenHeartbeats(t *testing.T) {
+	if testing.Short() {
+		t.Skip("HTTP2 idle deadline regression")
+	}
+	api, _, appendRecord := pageFixture(t)
+	server := httptest.NewUnstartedServer(api.Handler())
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	defer api.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", server.URL+"/v1/events", nil)
+	req.Header.Set("Last-Event-ID", string(api.cfg.Store.Status().Network)+":3")
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.ProtoMajor != 2 {
+		t.Fatal("HTTP2 not negotiated")
+	}
+	timer := time.NewTimer(eventWriteTimeout + 250*time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	appendRecord()
+	line, err := bufio.NewReader(resp.Body).ReadString('\n')
+	if err != nil || !strings.HasSuffix(line, ":4\n") {
+		t.Fatal("idle stream was aborted", line, err)
+	}
+}

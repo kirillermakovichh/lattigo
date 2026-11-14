@@ -30,7 +30,16 @@ func writeEventKind(w http.ResponseWriter, controller *http.ResponseController, 
 	if _, err := fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", id, kind, data); err != nil {
 		return err
 	}
-	return controller.Flush()
+	return flushEvent(controller)
+}
+
+// Clear write deadlines after each completed frame. HTTP/2 treats an expired
+// deadline as a stream abort even while no write is in progress.
+func flushEvent(controller *http.ResponseController) error {
+	if err := controller.Flush(); err != nil {
+		return err
+	}
+	return controller.SetWriteDeadline(time.Time{})
 }
 
 // events tails durable records directly, without retaining subscriber queues.
@@ -101,7 +110,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("X-Accel-Buffering", "no")
-	if err := controller.Flush(); err != nil {
+	if err := flushEvent(controller); err != nil {
 		return
 	}
 	heartbeat := time.NewTicker(eventHeartbeat)
@@ -154,7 +163,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			if _, err := fmt.Fprint(w, ": heartbeat\n\n"); err != nil {
 				return
 			}
-			if err := controller.Flush(); err != nil {
+			if err := flushEvent(controller); err != nil {
 				return
 			}
 		}
