@@ -216,6 +216,11 @@ func (n *Network) Run(ctx context.Context) error {
 // nextOutbound serves at most four priority frames before a waiting ordinary
 // frame. Both classes have independent count and retained-byte budgets.
 func (n *Network) nextOutbound(ctx context.Context) ([]byte, bool) {
+	select {
+	case <-ctx.Done():
+		return nil, false
+	default:
+	}
 	take := func(raw []byte, priority bool) ([]byte, bool) {
 		if priority {
 			n.priorityBytes.Add(-int64(len(raw)))
@@ -269,6 +274,11 @@ func (n *Network) runPeer(ctx context.Context, p *peer) {
 		}
 	}
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 		if burst >= 4 {
 			select {
 			case raw := <-p.queue:
