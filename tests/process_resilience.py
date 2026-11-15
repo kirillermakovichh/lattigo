@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import time
 
 from peer_proxy import PeerProxy
@@ -99,15 +100,65 @@ def partition_scenario(c):
     print("partition/heal: no minority confirmation; all representatives converged")
 
 
+def custody_scenario(c):
+    n = c.network
+    c.partition({0, 1})
+    outbox = n.path / "rep-0.wallet.pending-0.json"
+    command = [str(n.bin / "blwallet"), "send", "--wallet", str(n.path / "rep-0.wallet"),
+               "--to", c.destination, "--amount", "7", "--rpc", n.origins[0],
+               "--expected-network", c.genesis["network"], "--wait", "--timeout", "30s"]
+    payment = subprocess.Popen(command, env=n.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while not outbox.exists():
+            if payment.poll() is not None or time.monotonic() >= deadline:
+                raise AssertionError("wallet did not persist uncertain intent")
+            time.sleep(0.05)
+        original = outbox.read_bytes()
+        assert payment.poll() is None, "wallet did not retain ownership while waiting"
+        contender = subprocess.run(command[:-3] + ["--timeout", "3s"], env=n.env,
+                                   capture_output=True, text=True, timeout=10)
+        assert contender.returncode != 0 and "another payment operation" in contender.stderr, contender.stderr
+        assert outbox.read_bytes() == original, "concurrent wallet replaced signed intent"
+        n.kill(0)
+        payment.communicate(timeout=10)
+        assert payment.returncode != 0, "interrupted confirmation was reported as success"
+        assert outbox.read_bytes() == original, "node interruption changed durable intent"
+        inspected = n.wallet("rep-0", "outbox")
+        assert inspected["state"] == "stored", inspected
+        n.start(0)
+        c.heal()
+        retried = n.wallet("rep-0", "outbox", "--action", "retry", "--wait", "--rpc", n.origins[0],
+                           "--expected-network", c.genesis["network"], "--timeout", "50s")
+        assert retried["hash"] == inspected["hash"] and retried["status"] == "confirmed", retried
+        final = n.converge(range(4), 1)
+        n.kill(2)
+        n.start(2)
+        assert n.converge(range(4), 1)["tip"] == final["tip"]
+        for origin in n.origins[:4]:
+            balances = sum(int(rpc(origin, "/v1/account?address=" + account)["balance"]) for account in c.accounts)
+            incoming = rpc(origin, "/v1/receivables?address=" + c.destination)
+            assert balances + sum(int(row["amount"]) for row in incoming) == 10000
+            assert len(incoming) == 1 and incoming[0]["source"] == inspected["hash"]
+        duplicate = n.wallet("rep-0", "outbox", "--action", "retry", "--wait", "--rpc", n.origins[0], "--timeout", "10s")
+        assert duplicate["hash"] == inspected["hash"] and rpc(n.origins[0], "/v1/status")["height"] == 1
+        assert outbox.read_bytes() == original
+        print("custody/restart: concurrent CLI exclusion, exact outbox retry and supply conservation")
+    finally:
+        if payment.poll() is None:
+            payment.kill()
+        payment.communicate(timeout=5)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary-dir", type=Path)
-    parser.add_argument("--scenario", choices=["partition"], default="partition")
+    parser.add_argument("--scenario", choices=["partition", "custody"], default="partition")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="bl-process-resilience-") as temporary:
         binaries = args.binary_dir.resolve() if args.binary_dir else build_binaries(Path(temporary) / "bin")
         with Cluster(temporary, binaries) as cluster:
-            partition_scenario(cluster)
+            {"partition": partition_scenario, "custody": custody_scenario}[args.scenario](cluster)
 
 
 if __name__ == "__main__":
