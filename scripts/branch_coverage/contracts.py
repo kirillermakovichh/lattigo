@@ -106,3 +106,21 @@ for expression in ('[]string{"pending", "round", "observed_voting_weight", "quor
 
 def exclusion(site, outcome):
     return EXCLUDED.get((site["file"], site["function"], site["kind"], site["expression"], outcome))
+
+# Additive product contracts retain the raw unobserved outcomes. These guards
+# are structural consequences of the preceding validation in the same function.
+for file, function, kind, expression, outcome, reason in [
+ ("internal/client/batch.go", "validReadID", "range", "id", "empty", "the preceding length guard returns for an empty ID"),
+ ("internal/client/batch.go", "Batch", "range", "queries", "empty", "Batch rejects zero queries before validating IDs"),
+ ("internal/client/batch.go", "Batch", "range", "rows", "empty", "row count must equal the already nonempty query count"),
+ ("internal/client/options.go", "WithUserAgent", "range", "agent", "empty", "the preceding byte-length guard rejects empty agents"),
+ ("internal/rpc/batch.go", "validQueryID", "range", "id", "empty", "the preceding length guard rejects empty IDs"),
+ ("internal/rpc/batch.go", "batchRead", "range", "request.Queries", "empty", "batchRead rejects empty query arrays immediately after decoding"),
+ ("internal/p2p/dedup.go", "remember", "range", "c.entries", "empty", "pruning runs only with at least maxBurstEntries under the cache mutex"),
+ ("internal/ledger/state.go", "weights", "range", "s.delegated", "empty", "positive supply remains delegated to at least one representative after every checked transition"),
+ ("internal/ledger/state.go", "apply", "range", "s.delegated", "empty", "positive supply remains delegated to at least one representative; apply updates never remove nonzero total weight"),
+]:
+ EXCLUDED[(file,function,kind,expression,outcome)] = reason
+EXCLUDED[("internal/rpc/server.go", "metrics", "range", '[]string{"peers", "connected", "dropped", "received", "queued_bytes", "queued_messages", "retrying", "deduplicated", "queue_byte_budget", "queue_item_budget"}', "empty")] = "fixed nonempty aggregate metric-name literal"
+
+EXCLUDED[("internal/wallet/profile.go", "validName", "range", "name", "empty")] = "validName rejects empty names in the preceding length guard"

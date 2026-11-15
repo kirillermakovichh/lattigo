@@ -14,7 +14,10 @@ This is an independent protocol, not a Nano-compatible node.
 - Bounded peer gossip, verified catchup, authenticated payment RPC, readiness and metrics.
 - Local encrypted wallets, password rotation, named accounts, network-pinned contacts and durable outbox.
 - Payment URIs/request files, sequential receive-all, cursor RPC pages, read batches and public Go client.
-- Node/wallet/operator CLIs, generated private-network manifests and reproducible binary archives.
+- Resumable bounded confirmation streams, account/incoming filters and key-free wallet watch.
+- Fair priority peer delivery, bounded retry/deduplication and authenticated diagnostics.
+- Node/wallet/operator CLIs, read-only config validation, redacted doctor and bounded profiles.
+- Unprivileged container/systemd deployment and reproducible binary archives with build provenance.
 
 ## Build and run
 
@@ -39,6 +42,9 @@ python3 tests/network_smoke.py --binary-dir bin
 The integrated scenario starts four representative processes and a restored observer.
 It exercises send, receive, delegation, duplicate retries, quorum with one node offline,
 restart/catchup, unauthorized requests, backup and subsequent observer synchronization.
+`python3 tests/process_resilience.py --scenario partition --binary-dir bin`
+checks quorum loss and healing. Use `custody` for uncertain outbox recovery and
+concurrent wallet exclusion, or `network` for oversized/slow peers and event replay.
 [Release packaging](release/README.md) produces local archives and checksums without publishing.
 
 ## Limits and project map

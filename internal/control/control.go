@@ -34,7 +34,6 @@ func RunControl(ctx context.Context, args []string, out, errout io.Writer) error
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
 		_, e := fmt.Fprintln(out, "Usage: blctl <genesis|config|token|status|peers|backup|restore|inspect|verify|doctor|profile|ready> [flags]\nUse blctl <command> --help for flags. Runtime secrets are never printed.")
 
-
 		return e
 	}
 	if args[0] == "ready" {

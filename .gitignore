@@ -9,3 +9,7 @@
 .env
 .env.*
 !.env.example
+
+# Python verification tools
+__pycache__/
+*.py[cod]

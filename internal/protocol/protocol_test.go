@@ -81,3 +81,9 @@ func TestIndependentCanonicalVector(t *testing.T) {
 		t.Fatal("independent canonical vector mismatch")
 	}
 }
+
+func TestExtensionWorkInputLength(t *testing.T) {
+	if workOK(nil, 0, 0) || workOK(make([]byte, 31), 0, 0) {
+		t.Fatal("invalid work digest length")
+	}
+}

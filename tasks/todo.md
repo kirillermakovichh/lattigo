@@ -475,19 +475,19 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 
 | ID | Complete | Acceptance | Verification |
 | --- | --- | --- | --- |
-| BL-104 | [ ] | Process harness owns nodes temporary secrets and deadlines | Owned process scenario and cleanup checks |
-| BL-105 | [ ] | Controllable peer proxy supports deterministic partitions | Focused Go tests and race checks |
-| BL-106 | [ ] | Partitioned representatives wait for quorum and converge after healing | Focused Go tests and race checks |
-| BL-107 | [ ] | Killed unconfirmed submissions retain reusable outbox intent | Focused Go tests and race checks |
-| BL-108 | [ ] | Confirmed process restarts conserve funds and catch up | Owned process scenario and cleanup checks |
-| BL-109 | [ ] | Slow HTTP peers cannot consume unbounded queues or workers | Focused Go tests and race checks |
-| BL-110 | [ ] | Oversized process-level peer requests fail within input budgets | Owned process scenario and cleanup checks |
-| BL-111 | [ ] | Quorum loss changes readiness while preserving confirmed reads | Focused Go tests and race checks |
-| BL-112 | [ ] | Concurrent wallet processes preserve account exclusion | Owned process scenario and cleanup checks |
-| BL-113 | [ ] | Process event reconnection resumes without missing confirmed records | Owned process scenario and cleanup checks |
+| BL-104 | [x] | Process harness owns nodes temporary secrets and deadlines | Owned process scenario and cleanup checks |
+| BL-105 | [x] | Controllable peer proxy supports deterministic partitions | Focused Go tests and race checks |
+| BL-106 | [x] | Partitioned representatives wait for quorum and converge after healing | Focused Go tests and race checks |
+| BL-107 | [x] | Killed unconfirmed submissions retain reusable outbox intent | Focused Go tests and race checks |
+| BL-108 | [x] | Confirmed process restarts conserve funds and catch up | Owned process scenario and cleanup checks |
+| BL-109 | [x] | Slow HTTP peers cannot consume unbounded queues or workers | Focused Go tests and race checks |
+| BL-110 | [x] | Oversized process-level peer requests fail within input budgets | Owned process scenario and cleanup checks |
+| BL-111 | [x] | Quorum loss changes readiness while preserving confirmed reads | Focused Go tests and race checks |
+| BL-112 | [x] | Concurrent wallet processes preserve account exclusion | Owned process scenario and cleanup checks |
+| BL-113 | [x] | Process event reconnection resumes without missing confirmed records | Owned process scenario and cleanup checks |
 | BL-114 | [x] | Payment request fuzzing bounds parsing and canonicalization | Seed tests and bounded fuzz campaign |
 | BL-115 | [x] | Cursor fuzzing bounds malformed continuation input | Seed tests and bounded fuzz campaign |
 | BL-116 | [x] | Event parser fuzzing bounds partial and oversized frames | Seed tests and bounded fuzz campaign |
 | BL-117 | [x] | Randomized index checks preserve transfer and weight invariants | Focused Go tests and race checks |
 | BL-118 | [x] | Process interruption checks journal and signing recovery | Owned process scenario and cleanup checks |
-| BL-119 | [ ] | Packaged extended workflows pass the complete development gates | Owned process scenario and cleanup checks |
+| BL-119 | [x] | Packaged extended workflows pass the complete development gates | Owned process scenario and cleanup checks |

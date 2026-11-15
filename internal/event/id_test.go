@@ -2,6 +2,7 @@ package event
 
 import (
 	"example.com/go-block-lattice/internal/protocol"
+	"strings"
 	"testing"
 )
 
@@ -17,5 +18,14 @@ func TestCanonicalPosition(t *testing.T) {
 		if _, err := ParseID(raw, network); err == nil {
 			t.Fatal(raw)
 		}
+	}
+}
+
+func TestExtensionEventIdentifierBudgets(t *testing.T) {
+	if _, err := ParseID(strings.Repeat("x", 86), protocol.Digest([]byte("network"))); err == nil {
+		t.Fatal("oversized identifier")
+	}
+	if _, err := ParseID("bad:1", protocol.Hash("bad")); err == nil {
+		t.Fatal("invalid network digest")
 	}
 }

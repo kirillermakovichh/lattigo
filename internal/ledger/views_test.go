@@ -67,3 +67,45 @@ func TestReceivableViewRejectsChangedSnapshot(t *testing.T) {
 		t.Fatal("stale receivable snapshot accepted")
 	}
 }
+
+func TestReceivableViewBoundaryDecisions(t *testing.T) {
+	store, a, b, _ := viewFixture(t)
+	empty, err := store.ReceivableView(a, Anchor{}, "", 100)
+	if err != nil || len(empty.Items) != 0 || empty.More {
+		t.Fatal(empty, err)
+	}
+	all, err := store.ReceivableView(b, Anchor{}, "", 100)
+	if err != nil || len(all.Items) != 5 || all.More {
+		t.Fatal(all, err)
+	}
+	if _, err := store.ReceivableView(b, Anchor{Height: 100}, "", 1); err == nil {
+		t.Fatal("invalid anchor")
+	}
+}
+
+func TestExtensionRepresentativeChangeIndexes(t *testing.T) {
+	state, key, other := fixture(t)
+	a := protocol.Address(key.Public().(ed25519.PublicKey))
+	b := protocol.Address(other.Public().(ed25519.PublicKey))
+	store, err := Open(t.TempDir(), state.genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	current := state.accounts[a]
+	r := nextRecord(t, state, protocol.Block{Version: 1, Network: state.genesis.ID(), Kind: "change", Account: a, Previous: current.Frontier, Representative: b, Balance: current.Balance}, key)
+	if err := store.Commit(r); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.Account(a)
+	if got.Representative != b || len(store.Receivables(a, 0, 10)) != 0 || len(store.History(a, 0, 10)) != 1 {
+		t.Fatal("representative change altered payment indexes")
+	}
+}
+
+func TestReceivableViewRejectsMalformedAccount(t *testing.T) {
+	store, _, _, _ := viewFixture(t)
+	if _, err := store.ReceivableView("bad", Anchor{}, "", 1); !errors.Is(err, ErrInvalid) {
+		t.Fatal(err)
+	}
+}

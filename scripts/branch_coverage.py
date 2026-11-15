@@ -58,6 +58,12 @@ def main():
                                cwd=copy, env=env, check=True)
             subprocess.run(["python3", str(copy / "tests/network_smoke.py"), "--binary-dir", str(binaries)],
                            cwd=copy, env=env, check=True)
+            subprocess.run(["python3", str(copy / "tests/wallet_workflows.py"),
+                            "--binary", str(binaries / "blwallet")], cwd=copy, env=env, check=True)
+            for scenario in ("partition", "custody", "network"):
+                subprocess.run(["python3", str(copy / "tests/process_resilience.py"),
+                                "--scenario", scenario, "--binary-dir", str(binaries)],
+                               cwd=copy, env=env, check=True)
             for name in ("blnode", "blwallet", "blctl"):
                 for arguments in (["--help"], ["--version"], ["--not-a-valid-flag"]):
                     result = subprocess.run([str(binaries / name), *arguments], env=env,
