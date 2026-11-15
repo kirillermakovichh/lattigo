@@ -2,6 +2,9 @@
 """Real-process quorum, interruption and bounded-resource scenarios."""
 import argparse
 import json
+import http.client
+import socket
+from urllib.parse import urlsplit
 from pathlib import Path
 import tempfile
 import subprocess
@@ -150,15 +153,100 @@ def custody_scenario(c):
         payment.communicate(timeout=5)
 
 
+def peer_request(c, index, method, path, body=None):
+    target = urlsplit(c.network.peers[index])
+    conn = http.client.HTTPConnection(target.hostname, target.port, timeout=5)
+    try:
+        conn.request(method, path, body, {"X-BL-Network": c.genesis["network"], "X-BL-Version": "1"})
+        response = conn.getresponse()
+        data = response.read(4097)
+        assert len(data) <= 4096, "unbounded peer rejection response"
+        return response.status, data
+    finally:
+        conn.close()
+
+
+def network_scenario(c):
+    n = c.network
+    c.proxies[0, 3].slow.set()
+    first = c.send("2", wait=True, timeout="50s")
+    assert first["status"] == "confirmed", first
+    n.converge(range(4), 1)
+    for origin in n.origins[:4]:
+        peers = rpc(origin, "/v1/admin/peers", token=n.token)
+        assert len(peers) == 3
+        for peer in peers:
+            assert 0 <= peer["queued_bytes"] <= 48 << 20, peer
+            assert 0 <= peer["queued_messages"] <= 48, peer
+    c.proxies[0, 3].slow.clear()
+    # Hold the16 admitted P2P handlers on incomplete bodies. RPC is independent.
+    for (src, dst), proxy in c.proxies.items():
+        if dst == 3:
+            proxy.blocked.set()
+    sockets = []
+    try:
+        for _ in range(16):
+            peer = socket.create_connection(("127.0.0.1", n.peer_ports[3]), timeout=3)
+            sockets.append(peer)
+            peer.sendall(("POST /p2p/message HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1024\r\n"
+                          "X-BL-Network: " + c.genesis["network"] + "\r\nX-BL-Version: 1\r\n\r\n{").encode())
+        deadline = time.monotonic() + 3
+        while True:
+            status, _ = peer_request(c, 3, "GET", "/p2p/status")
+            if status == 503:
+                break
+            assert time.monotonic() < deadline, "P2P handler capacity was not enforced"
+            time.sleep(0.05)
+        assert rpc(n.origins[3], "/v1/status")["height"] == 1
+    finally:
+        for peer in sockets:
+            peer.close()
+        c.heal()
+    deadline = time.monotonic() + 5
+    while peer_request(c, 3, "GET", "/p2p/status")[0] != 200:
+        assert time.monotonic() < deadline, "disconnected readers retained P2P capacity"
+        time.sleep(0.05)
+    status, _ = peer_request(c, 3, "POST", "/p2p/message", b" " * ((20 << 20) + 1))
+    assert status == 400, status
+    assert rpc(n.origins[3], "/v1/status")["height"] == 1
+    # No spending key or password is passed to the explicit-address event consumer.
+    watch = [str(n.bin / "blwallet"), "watch", "--address", c.destination, "--incoming",
+             "--rpc", n.origins[0], "--expected-network", c.genesis["network"], "--count", "1", "--timeout", "30s"]
+    env = {k: v for k, v in n.env.items() if k != "BL_WALLET_PASSWORD"}
+    replay = subprocess.run(watch, env=env, capture_output=True, text=True, timeout=35)
+    assert replay.returncode == 0, replay.stderr
+    delivered = json.loads(replay.stdout)
+    assert delivered["height"] == 1 and delivered["block"]["balance"] == "2498", delivered
+    consumer = subprocess.Popen(watch + ["--after", delivered["id"]], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        time.sleep(0.5)
+        assert consumer.poll() is None, "watch exited before restart"
+        n.kill(0)
+        n.start(0)
+        second = c.send("3", wait=True, timeout="50s")
+        n.converge(range(4), 2)
+        stdout, stderr = consumer.communicate(timeout=30)
+        assert consumer.returncode == 0, stderr
+        resumed = json.loads(stdout)
+        assert resumed["height"] == 2 and resumed["id"] == c.genesis["network"] + ":2", resumed
+        assert resumed["block"]["balance"] == "2495" and second["status"] == "confirmed", resumed
+        print("network bounds/resume: slow peer fairness, handler/byte limits and restart event replay")
+    finally:
+        if consumer.poll() is None:
+            consumer.kill()
+        consumer.communicate(timeout=5)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary-dir", type=Path)
-    parser.add_argument("--scenario", choices=["partition", "custody"], default="partition")
+    parser.add_argument("--scenario", choices=["partition", "custody", "network"], default="partition")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="bl-process-resilience-") as temporary:
         binaries = args.binary_dir.resolve() if args.binary_dir else build_binaries(Path(temporary) / "bin")
         with Cluster(temporary, binaries) as cluster:
-            {"partition": partition_scenario, "custody": custody_scenario}[args.scenario](cluster)
+            {"partition": partition_scenario, "custody": custody_scenario, "network": network_scenario}[args.scenario](cluster)
 
 
 if __name__ == "__main__":
