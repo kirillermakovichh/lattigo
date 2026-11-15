@@ -4,10 +4,12 @@ package storage
 
 import (
 	"errors"
+	"example.com/go-block-lattice/internal/faultprobe"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -111,5 +113,25 @@ func TestInitialJournalDependencyFailures(t *testing.T) {
 				t.Fatalf("initial journal error lost: %v", err)
 			}
 		})
+	}
+}
+
+func TestJournalRejectsLockReplacedAfterInspection(t *testing.T) {
+	dir := t.TempDir()
+	faultprobe.Before("journal.go/open/os.OpenFile/1", 1, func() {
+		if err := syscall.Mkfifo(filepath.Join(dir, "LOCK"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	})
+	defer faultprobe.Arm("", 0)
+	j, err := Open(dir, []byte("genesis"), func([]byte) error { return nil })
+	if j != nil {
+		j.Close()
+	}
+	if err == nil || !faultprobe.Reached() {
+		t.Fatal("replaced lock accepted", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ledger.wal")); !os.IsNotExist(err) {
+		t.Fatal("replaced lock created WAL")
 	}
 }

@@ -44,14 +44,26 @@ func open(directory string, header []byte, apply func([]byte) error, repair bool
 	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("storage directory must be a real directory")
 	}
-	_, lockStatErr := os.Lstat(filepath.Join(directory, "LOCK"))
+	lockInfo, lockStatErr := os.Lstat(filepath.Join(directory, "LOCK"))
 	if lockStatErr != nil && !errors.Is(lockStatErr, os.ErrNotExist) {
 		return nil, lockStatErr
 	}
+	if lockStatErr == nil && !lockInfo.Mode().IsRegular() {
+		return nil, errors.New("directory lock must be a regular file")
+	}
 	lockExisted := lockStatErr == nil
-	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
+	lock, e := os.OpenFile(filepath.Join(directory, "LOCK"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
+	}
+	lockInfo, e = lock.Stat()
+	if e != nil {
+		lock.Close()
+		return nil, e
+	}
+	if !lockInfo.Mode().IsRegular() {
+		lock.Close()
+		return nil, errors.New("directory lock must be a regular file")
 	}
 	if e = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
 		lock.Close()

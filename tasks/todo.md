@@ -491,3 +491,9 @@ are added to docs. BL-020/BL-021 keep their independent release requirements.
 | BL-117 | [x] | Randomized index checks preserve transfer and weight invariants | Focused Go tests and race checks |
 | BL-118 | [x] | Process interruption checks journal and signing recovery | Owned process scenario and cleanup checks |
 | BL-119 | [x] | Packaged extended workflows pass the complete development gates | Owned process scenario and cleanup checks |
+
+## Post-publication maintenance
+
+| ID | Complete | Acceptance | Verification |
+| --- | --- | --- | --- |
+| BL-120 | [x] | Journal rejects nonregular lock paths and descriptors before creating WAL | Storage race tests, injected lock replacement, make check and hosted Linux Check |
